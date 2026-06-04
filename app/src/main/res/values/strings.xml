@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Altitude Widget</string>
+    <string name="widget_description">고도 변화 측정 Ear Barotrauma 예방 알림 위젯</string>
+    <string name="altitude_measuring">현재 고도: 측정 중...</string>
+    <string name="altitude_change_default">변화량: -</string>
+    <string name="action_waiting">센서 초기화 중...</string>
+    <string name="channel_name">고도 모니터링</string>
+    <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
+</resources>
