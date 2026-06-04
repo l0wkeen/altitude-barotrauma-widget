@@ -1,0 +1,6 @@
+<resources>
+    <!-- 위젯 전용 앱이라 액티비티 테마 불필요, MaterialComponents 기반 최소 테마 사용 -->
+    <style name="Theme.AltitudeWidget" parent="android:Theme">
+        <!-- 위젯 실행 시 테마 적용 -->
+    </style>
+</resources>
