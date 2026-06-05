@@ -3,23 +3,19 @@ package com.example.altitudewidget
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.widget.RemoteViews
 
 /**
  * Ear Barotrauma 예방 고도 변화 측정 위젯
  *
  * 동작 흐름:
- * 1. 기압 센서(SensorManager)로 기압값 읽기
- * 2. SensorManager.getAltitude()로 해발 고도 계산
- * 3. SharedPreferences에 이전 고도 저장 -> 변화량 계산
- * 4. 위험 구간 판단 후 추천 행동 표시
+ * 1. AltitudeService가 기압 센서로 고도 측정 후 SharedPreferences에 저장
+ * 2. 이 클래스는 SharedPreferences를 읽어 위젯 UI 갱신
+ * 3. 고도 변화량 기준 행동 추천 표시
  */
 class AltitudeWidgetProvider : AppWidgetProvider() {
 
@@ -28,11 +24,11 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         const val KEY_PREV_ALTITUDE = "prev_altitude"
         const val KEY_CURRENT_ALTITUDE = "current_altitude"
 
-        /** 위젯 전체 갱신 (외부에서 호출 가능) */
+        /** 위젯 전체 갱신 (AltitudeService에서 호출) */
         fun updateAllWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
-                android.content.ComponentName(context, AltitudeWidgetProvider::class.java)
+                ComponentName(context, AltitudeWidgetProvider::class.java)
             )
             for (id in ids) {
                 updateWidgetView(context, manager, id)
@@ -79,7 +75,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.text_altitude_change, changeText)
             views.setTextViewText(R.id.text_action, actionMessage)
 
-            // 위젯 탭 시 서비스 재시작
+            // 위젯 탭 시 AltitudeService 재시작
             val intent = Intent(context, AltitudeService::class.java)
             val pendingIntent = PendingIntent.getService(
                 context, 0, intent,
@@ -114,10 +110,8 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // 서비스 시작 (기압 센서 측정)
-        val serviceIntent = Intent(context, AltitudeService::class.java)
-        context.startService(serviceIntent)
-        // 각 위젯 뷰 갱신
+        // 가 위젯 추가될 때 AltitudeService 시작
+        context.startService(Intent(context, AltitudeService::class.java))
         for (appWidgetId in appWidgetIds) {
             updateWidgetView(context, appWidgetManager, appWidgetId)
         }
@@ -125,13 +119,11 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        val serviceIntent = Intent(context, AltitudeService::class.java)
-        context.startService(serviceIntent)
+        context.startService(Intent(context, AltitudeService::class.java))
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        val serviceIntent = Intent(context, AltitudeService::class.java)
-        context.stopService(serviceIntent)
+        context.stopService(Intent(context, AltitudeService::class.java))
     }
 }
