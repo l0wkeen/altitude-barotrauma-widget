@@ -2,9 +2,9 @@
 <!--
     Ear Barotrauma 예방 위젯 레이아웃
     - 상단: 현재 고도 (크게, 굵게)
-    - 중단: 5분 누적 변화량 + 방향 아이콘 (▲/▼)
+    - 중단: 1분 누적 변화량 + 3초 즉각 변화량
     - 하단: 행동 추천 메시지 (위험도별 색상은 코드에서 동적 적용)
-    - RemoteViews 제약: colorBackgroundDark/system accent 사용 불가
+    - RemoteViews 제약: 루트 layout_height는 wrap_content 또는 고정값만 허용
 -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -14,16 +14,15 @@
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="wrap_content">
 
-    <!-- 상단 행: 아이콘 라벨 + 현재 고도 -->
+    <!-- 상단 행: 위젯 라벨 + 현재 고도 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- 위젯 타이틀 라벨 -->
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -33,7 +32,6 @@
             android:textColor="#99FFFFFF"
             android:letterSpacing="0.05" />
 
-        <!-- 현재 고도 (우측 정렬) -->
         <TextView
             android:id="@+id/text_altitude"
             android:layout_width="wrap_content"
@@ -52,7 +50,7 @@
         android:layout_marginBottom="6dp"
         android:background="#33FFFFFF" />
 
-    <!-- 중단: 5분 누적 변화량 -->
+    <!-- 중단: 변화량 -->
     <TextView
         android:id="@+id/text_altitude_change"
         android:layout_width="match_parent"
@@ -62,7 +60,7 @@
         android:textColor="#CCFFFFFF"
         android:layout_marginBottom="5dp" />
 
-    <!-- 하단: 행동 추천 메시지 (가장 크고 굵게 - 핵심 정보) -->
+    <!-- 하단: 행동 추천 -->
     <TextView
         android:id="@+id/text_action"
         android:layout_width="match_parent"
