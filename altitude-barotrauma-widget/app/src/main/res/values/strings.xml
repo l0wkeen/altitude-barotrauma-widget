@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">고도 위젯</string>
+    <string name="widget_description">고도 변화 측정 Ear Barotrauma 예방 알림 위젯</string>
+
+    <!-- 고도 표시 -->
+    <string name="altitude_format">현재 고도: %,.0f m</string>
+    <string name="altitude_measuring">현재 고도: 측정 중…</string>
+
+    <!-- 변화량 표시 -->
+    <string name="change_accumulated_format">5분 누적: %+.1f m</string>
+    <string name="change_immediate_format">30초: %+.1f m</string>
+    <string name="change_no_data">누적 변화 측정 중…</string>
+
+    <!-- 행동 추천 -->
+    <string name="action_valsalva">⚠️ 발살바 (코 막고 후풍)</string>
+    <string name="action_yawn">하품 또는 침 삼키기</string>
+    <string name="action_drink">물을 조금 마시세요</string>
+    <string name="action_normal">✅ 고도 변화 정상</string>
+    <string name="action_initializing">센서 초기화 중…</string>
+
+    <!-- 오류 -->
+    <string name="error_no_sensor">⚠️ 기압 센서 없음</string>
+
+    <!-- 알림 채널 -->
+    <string name="channel_name">고도 모니터링</string>
+    <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
+    <string name="notif_starting">센서 시작 중…</string>
+</resources>
