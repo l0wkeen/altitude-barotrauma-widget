@@ -21,16 +21,16 @@ import androidx.core.app.NotificationCompat
  * - TYPE_PRESSURE 센서로 기압(hPa) 측정
  * - SensorManager.getAltitude()로 해발고도 계산
  * - 이동평균 5개 샘플로 노이즈 제거
- * - 30초 간격으로 위젯 갱신
- * - 5분 슬라이딩 윈도우로 누적 변화량 계산
+ * - 3초 간격으로 위젯 갱신
+ * - 1분 슬라이딩 윈도우로 누적 변화량 계산
  */
 class AltitudeService : Service(), SensorEventListener {
 
     companion object {
         private const val CHANNEL_ID = "altitude_channel"
         private const val NOTIFICATION_ID = 1
-        private const val UPDATE_INTERVAL_MS = 30_000L  // 30초
-        private const val WINDOW_DURATION_MS = 5 * 60 * 1000L  // 5분
+        private const val UPDATE_INTERVAL_MS = 3_000L       // 3초 즈각 갱신
+        private const val WINDOW_DURATION_MS = 60_000L      // 1분 누적 윈도우
         private const val MOVING_AVG_SIZE = 5
     }
 
@@ -41,12 +41,12 @@ class AltitudeService : Service(), SensorEventListener {
     // 이동평균 버퍼
     private val altitudeBuffer = ArrayDeque<Float>(MOVING_AVG_SIZE)
 
-    // 5분 슬라이딩 윈도우
+    // 1분 슬라이딩 윈도우
     private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
 
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
 
-    // 30초마다 위젯 갱신 Runnable
+    // 3초마다 위젯 갱신 Runnable
     private val updateRunnable = object : Runnable {
         override fun run() {
             saveAndUpdate()
@@ -60,7 +60,6 @@ class AltitudeService : Service(), SensorEventListener {
         pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
         if (pressureSensor == null) {
-            // 센서 없음 안내
             getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, false)
@@ -117,16 +116,16 @@ class AltitudeService : Service(), SensorEventListener {
         val prevAltitude = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE)
         val now = System.currentTimeMillis()
 
-        // 5분 윈도우에 현재 고도 추가
+        // 1분 윈도우에 현재 고도 추가
         altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
 
-        // 5분 이전 데이터 제거
+        // 1분 이전 데이터 제거
         while (altitudeHistory.isNotEmpty() &&
             now - altitudeHistory.first().first > WINDOW_DURATION_MS) {
             altitudeHistory.removeFirst()
         }
 
-        // 5분 누적 변화량
+        // 1분 누적 변화량
         val accumulatedChange = if (altitudeHistory.size >= 2) {
             latestSmoothedAltitude - altitudeHistory.first().second
         } else 0f
