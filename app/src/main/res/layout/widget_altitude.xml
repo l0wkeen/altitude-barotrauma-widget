@@ -1,48 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    - android:colorBackgroundDark 또는 system accent 사용 불가 (RemoteViews.setTextColor 필요)
-    - 고도 표시: 5초 평균으로 부드럽게
-    - 액션 표시: 30초 직전 센서 데이터 기반
+    Ear Barotrauma 예방 위젯 레이아웃
+    - 상단: 현재 고도 (크게, 굵게)
+    - 중단: 5분 누적 변화량 + 방향 아이콘 (▲/▼)
+    - 하단: 행동 추천 메시지 (위험도별 색상은 코드에서 동적 적용)
+    - RemoteViews 제약: colorBackgroundDark/system accent 사용 불가
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="12dp"
     android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="match_parent">
 
-    <!-- 고도 -->
-    <TextView
-        android:id="@+id/text_altitude"
-        android:layout_width="wrap_content"
+    <!-- 상단 행: 아이콘 라벨 + 현재 고도 -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/altitude_measuring"
-        android:textSize="17sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFFFF"
-        android:letterSpacing="0.01" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <!-- 고도 변화 (5초/30초) -->
+        <!-- 위젯 타이틀 라벨 -->
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/widget_label"
+            android:textSize="10sp"
+            android:textColor="#99FFFFFF"
+            android:letterSpacing="0.05" />
+
+        <!-- 현재 고도 (우측 정렬) -->
+        <TextView
+            android:id="@+id/text_altitude"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/altitude_measuring"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFFFF" />
+    </LinearLayout>
+
+    <!-- 구분선 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="#33FFFFFF" />
+
+    <!-- 중단: 5분 누적 변화량 -->
     <TextView
         android:id="@+id/text_altitude_change"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/change_no_data"
         android:textSize="12sp"
         android:textColor="#CCFFFFFF"
-        android:layout_marginTop="3dp" />
+        android:layout_marginBottom="5dp" />
 
-    <!-- 현재 권장 액션 -->
+    <!-- 하단: 행동 추천 메시지 (가장 크고 굵게 - 핵심 정보) -->
     <TextView
         android:id="@+id/text_action"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/action_initializing"
-        android:textSize="14sp"
+        android:textSize="15sp"
         android:textStyle="bold"
         android:textColor="#FFFFFFFF"
-        android:layout_marginTop="7dp" />
+        android:gravity="center_horizontal" />
 
 </LinearLayout>
