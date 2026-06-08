@@ -21,85 +21,104 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
     companion object {
         const val PREFS_NAME = "AltitudePrefs"
+        const val KEY_ALTITUDE = "current_altitude"
         const val KEY_PREV_ALTITUDE = "prev_altitude"
-        const val KEY_CURRENT_ALTITUDE = "current_altitude"
+        const val KEY_ACCUMULATED_CHANGE = "accumulated_change"
+        const val KEY_HAS_SENSOR = "has_sensor"
+        const val INVALID_ALTITUDE = Float.MIN_VALUE
 
-        /** 위젯 전체 갱신 (AltitudeService에서 호출) */
-        fun updateAllWidgets(context: Context) {
+        fun updateWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
                 ComponentName(context, AltitudeWidgetProvider::class.java)
             )
             for (id in ids) {
-                updateWidgetView(context, manager, id)
+                updateWidget(context, manager, id)
             }
         }
 
-        fun updateWidgetView(
-            context: Context,
-            appWidgetManager: AppWidgetManager,
-            appWidgetId: Int
-        ) {
+        private fun updateWidget(context: Context, manager: AppWidgetManager, widgetId: Int) {
             val prefs: SharedPreferences =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-            val currentAltitude: Float? =
-                if (prefs.contains(KEY_CURRENT_ALTITUDE))
-                    prefs.getFloat(KEY_CURRENT_ALTITUDE, 0f)
-                else null
-
-            val prevAltitude: Float? =
-                if (prefs.contains(KEY_PREV_ALTITUDE))
-                    prefs.getFloat(KEY_PREV_ALTITUDE, 0f)
-                else null
-
-            val altitudeChange: Float? =
-                if (currentAltitude != null && prevAltitude != null)
-                    currentAltitude - prevAltitude
-                else null
-
-            val altitudeText = if (currentAltitude != null)
-                "현재 고도: ${"%,.0f".format(currentAltitude)} m"
-            else
-                "현재 고도: 측정 중..."
-
-            val changeText = if (altitudeChange != null)
-                "변화량: ${String.format("%+.1f", altitudeChange)} m"
-            else
-                "변화량: -"
-
-            val actionMessage = getActionRecommendation(altitudeChange)
+            val hasSensor = prefs.getBoolean(KEY_HAS_SENSOR, true)
+            val currentAltitude = prefs.getFloat(KEY_ALTITUDE, INVALID_ALTITUDE)
+            val prevAltitude = prefs.getFloat(KEY_PREV_ALTITUDE, INVALID_ALTITUDE)
+            val accumulatedChange = prefs.getFloat(KEY_ACCUMULATED_CHANGE, 0f)
 
             val views = RemoteViews(context.packageName, R.layout.widget_altitude)
+
+            // 위젯 클릭 시 앱 실행 인텐트
+            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            if (intent != null) {
+                val pendingIntent = PendingIntent.getActivity(
+                    context, 0, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
+            }
+
+            if (!hasSensor) {
+                // 센서 없음 처리
+                views.setTextViewText(R.id.text_altitude, context.getString(R.string.no_sensor))
+                views.setTextViewText(R.id.text_altitude_change, "")
+                views.setTextViewText(R.id.text_action, "")
+                manager.updateAppWidget(widgetId, views)
+                return
+            }
+
+            if (currentAltitude == INVALID_ALTITUDE) {
+                // 초기화 중
+                views.setTextViewText(R.id.text_altitude, context.getString(R.string.altitude_measuring))
+                views.setTextViewText(R.id.text_altitude_change, context.getString(R.string.change_no_data))
+                views.setTextViewText(R.id.text_action, context.getString(R.string.action_initializing))
+                manager.updateAppWidget(widgetId, views)
+                return
+            }
+
+            // 현재 고도 텍스트
+            val altitudeText = context.getString(R.string.altitude_format, currentAltitude)
+
+            // 즉각 변화량 (30초)
+            val immediateChange = if (prevAltitude != INVALID_ALTITUDE)
+                currentAltitude - prevAltitude else 0f
+
+            // 변화량 텍스트: 5분 누적 + 즉각
+            val changeText = context.getString(
+                R.string.change_accumulated_format,
+                accumulatedChange,
+                immediateChange
+            )
+
+            // 행동 추천 및 색상 (5분 누적 기준)
+            val (actionMessage, actionColor) = getActionRecommendation(context, accumulatedChange)
+
             views.setTextViewText(R.id.text_altitude, altitudeText)
             views.setTextViewText(R.id.text_altitude_change, changeText)
             views.setTextViewText(R.id.text_action, actionMessage)
+            views.setTextColor(R.id.text_action, actionColor)
 
-            // 위젯 탭 시 AltitudeService 재시작
-            val intent = Intent(context, AltitudeService::class.java)
-            val pendingIntent = PendingIntent.getService(
-                context, 0, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
-
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            manager.updateAppWidget(widgetId, views)
         }
 
-        /**
-         * 고도 변화량에 따라 ear barotrauma 예방 행동 추천
-         * @param change 고도 변화량 (m), 양수=상승, 음수=하강
-         */
-        fun getActionRecommendation(change: Float?): String {
-            if (change == null) return "센서 초기화 중..."
+        private fun getActionRecommendation(context: Context, change: Float): Pair<String, Int> {
+            val absChange = Math.abs(change)
             return when {
-                change >= 50f  -> "⚠️ 발살바 (코 막고 후풍)"
-                change >= 30f  -> "하품 또는 침 삼키기"
-                change >= 15f  -> "물을 조금 마시세요"
-                change <= -50f -> "⚠️ 발살바 (코 막고 후풍)"
-                change <= -30f -> "하품 또는 침 삼키기"
-                change <= -15f -> "물을 조금 마시세요"
-                else           -> "고도 변화 정상"
+                absChange == 0f ->
+                    Pair(context.getString(R.string.action_initializing),
+                        context.getColor(android.R.color.white))
+                absChange >= 50f ->
+                    Pair(context.getString(R.string.action_valsalva),
+                        context.getColor(android.R.color.holo_red_light))
+                absChange >= 30f ->
+                    Pair(context.getString(R.string.action_yawn),
+                        context.getColor(android.R.color.holo_orange_light))
+                absChange >= 15f ->
+                    Pair(context.getString(R.string.action_drink),
+                        context.getColor(android.R.color.holo_blue_light))
+                else ->
+                    Pair(context.getString(R.string.action_normal),
+                        context.getColor(android.R.color.holo_green_light))
             }
         }
     }
@@ -109,21 +128,23 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        super.onUpdate(context, appWidgetManager, appWidgetIds)
-        // 가 위젯 추가될 때 AltitudeService 시작
-        context.startService(Intent(context, AltitudeService::class.java))
-        for (appWidgetId in appWidgetIds) {
-            updateWidgetView(context, appWidgetManager, appWidgetId)
+        for (widgetId in appWidgetIds) {
+            updateWidget(context, appWidgetManager, widgetId)
         }
+        // 서비스 시작
+        val serviceIntent = Intent(context, AltitudeService::class.java)
+        context.startForegroundService(serviceIntent)
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        context.startService(Intent(context, AltitudeService::class.java))
+        val serviceIntent = Intent(context, AltitudeService::class.java)
+        context.startForegroundService(serviceIntent)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        context.stopService(Intent(context, AltitudeService::class.java))
+        val serviceIntent = Intent(context, AltitudeService::class.java)
+        context.stopService(serviceIntent)
     }
 }
