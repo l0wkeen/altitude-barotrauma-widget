@@ -1,12 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.altitudewidget">
 
-    <!-- 포그라운드 서비스 권한 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 14(API 34)+ 에서 foregroundServiceType="dataSync" 사용 시 필요 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- 부팅 후 서비스 자동 시작 (선택적) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -14,7 +13,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AltitudeWidget">
 
-        <!-- Widget Provider -->
         <receiver
             android:name=".AltitudeWidgetProvider"
             android:exported="true">
@@ -26,7 +24,14 @@
                 android:resource="@xml/altitude_widget_info" />
         </receiver>
 
-        <!-- Altitude Foreground Service -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".AltitudeService"
             android:exported="false"
