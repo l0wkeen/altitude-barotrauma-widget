@@ -1,4 +1,0 @@
-<resources>
-    <!-- 위젯 전용 앱: Activity 없으므로 최소 테마 사용 -->
-    <style name="Theme.AltitudeWidget" parent="android:Theme.DeviceDefault" />
-</resources>
