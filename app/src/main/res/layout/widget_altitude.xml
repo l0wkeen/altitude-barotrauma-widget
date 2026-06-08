@@ -1,38 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    - android:colorBackgroundDark 또는 system accent 사용 불가 (RemoteViews.setTextColor 필요)
+    - 고도 표시: 5초 평균으로 부드럽게
+    - 액션 표시: 30초 직전 센서 데이터 기반
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:orientation="vertical"
-    android:padding="12dp"
-    android:background="@android:color/white"
+    android:padding="14dp"
+    android:background="@drawable/widget_background"
     android:gravity="center_vertical"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
+    <!-- 고도 -->
     <TextView
         android:id="@+id/text_altitude"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="현재 고도: - m"
-        android:textSize="16sp"
+        android:text="@string/altitude_measuring"
+        android:textSize="17sp"
         android:textStyle="bold"
-        android:textColor="#000000" />
+        android:textColor="#FFFFFFFF"
+        android:letterSpacing="0.01" />
 
+    <!-- 고도 변화 (5초/30초) -->
     <TextView
         android:id="@+id/text_altitude_change"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="변화량: - m"
-        android:textSize="13sp"
-        android:textColor="#444444"
-        android:layout_marginTop="2dp" />
+        android:text="@string/change_no_data"
+        android:textSize="12sp"
+        android:textColor="#CCFFFFFF"
+        android:layout_marginTop="3dp" />
 
+    <!-- 현재 권장 액션 -->
     <TextView
         android:id="@+id/text_action"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="행동 추천 대기중"
+        android:text="@string/action_initializing"
         android:textSize="14sp"
-        android:textColor="#CC0000"
-        android:layout_marginTop="6dp" />
+        android:textStyle="bold"
+        android:textColor="#FFFFFFFF"
+        android:layout_marginTop="7dp" />
 
 </LinearLayout>
