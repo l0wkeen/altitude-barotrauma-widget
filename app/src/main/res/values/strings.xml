@@ -1,9 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Altitude Widget</string>
-    <string name="widget_description">고도 변화 측정 Ear Barotrauma 예방 알림 위젯</string>
-    <string name="altitude_measuring">현재 고도: 측정 중...</string>
-    <string name="altitude_change_default">변화량: -</string>
-    <string name="action_waiting">센서 초기화 중...</string>
+    <string name="widget_description">Ear Barotrauma 예방 알림 위젯</string>
+
+    <!-- 고도 표시 -->
+    <string name="altitude_format">%,.0f m</string>
+    <string name="altitude_measuring">측정 중…</string>
+
+    <!-- 변화량 -->
+    <string name="change_accumulated_format">5초: %+.1f m</string>
+    <string name="change_immediate_format">30초: %+.1f m</string>
+    <string name="change_no_data">변화량: -</string>
+
+    <!-- 액션 -->
+    <string name="action_valsalva">팁집기 방법 시도</string>
+    <string name="action_yawn">하하하을 하세요</string>
+    <string name="action_drink">마시거나 삼켜보세요</string>
+    <string name="action_normal">정상 상태</string>
+    <string name="action_initializing">초기화 중…</string>
+
+    <!-- 오류 -->
+    <string name="error_no_sensor">압력 센서 없음</string>
+
+    <!-- 알림 채널 -->
     <string name="channel_name">고도 모니터링</string>
     <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
+    <string name="notif_starting">고도 모니터링 시작 중…</string>
 </resources>
