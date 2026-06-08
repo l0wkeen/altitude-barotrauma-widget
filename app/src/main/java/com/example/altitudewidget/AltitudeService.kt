@@ -19,121 +19,151 @@ import androidx.core.app.NotificationCompat
  * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service
  *
  * - TYPE_PRESSURE 센서로 기압(hPa) 측정
- * - SensorManager.getAltitude()로 표준대기압 기준 해발고도 계산
- * - 30초마다 새 고도를 저장하고 위젯 갱신
+ * - SensorManager.getAltitude()로 해발고도 계산
+ * - 이동평균 5개 샘플로 노이즈 제거
+ * - 30초 간격으로 위젯 갱신
+ * - 5분 슬라이딩 윈도우로 누적 변화량 계산
  */
 class AltitudeService : Service(), SensorEventListener {
+
+    companion object {
+        private const val CHANNEL_ID = "altitude_channel"
+        private const val NOTIFICATION_ID = 1
+        private const val UPDATE_INTERVAL_MS = 30_000L  // 30초
+        private const val WINDOW_DURATION_MS = 5 * 60 * 1000L  // 5분
+        private const val MOVING_AVG_SIZE = 5
+    }
 
     private lateinit var sensorManager: SensorManager
     private var pressureSensor: Sensor? = null
     private val handler = Handler(Looper.getMainLooper())
 
-    // 위젯 갱신 최소 주기: 30초
-    private val UPDATE_INTERVAL_MS = 30_000L
-    // 마지막으로 저장한 시간스탬프 (0 = 아직 저장 안 한)
-    private var lastUpdateTime: Long = 0L
+    // 이동평균 버퍼
+    private val altitudeBuffer = ArrayDeque<Float>(MOVING_AVG_SIZE)
 
-    companion object {
-        const val CHANNEL_ID = "altitude_service_channel"
-        const val NOTIFICATION_ID = 1001
+    // 5분 슬라이딩 윈도우
+    private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
+
+    private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
+
+    // 30초마다 위젯 갱신 Runnable
+    private val updateRunnable = object : Runnable {
+        override fun run() {
+            saveAndUpdate()
+            handler.postDelayed(this, UPDATE_INTERVAL_MS)
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("센서 시작 중..."))
-    }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        pressureSensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-        } ?: run {
-            // 기압 센서가 없는 기기는 서비스 종료
+        if (pressureSensor == null) {
+            // 센서 없음 안내
+            getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, false)
+                .apply()
+            AltitudeWidgetProvider.updateWidgets(this)
             stopSelf()
-        }
-        return START_STICKY
-    }
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event == null || event.sensor.type != Sensor.TYPE_PRESSURE) return
-
-        val now = System.currentTimeMillis()
-        // 30초가 지나지 않았으면 무시 -> 배터리 절약
-        if (now - lastUpdateTime < UPDATE_INTERVAL_MS) return
-        lastUpdateTime = now
-
-        val pressureHpa = event.values[0]
-        // 표준대기압(1013.25 hPa) 기준 해발고도 계산
-        val currentAltitude = SensorManager.getAltitude(
-            SensorManager.PRESSURE_STANDARD_ATMOSPHERE,
-            pressureHpa
-        )
-        saveAndUpdateWidget(currentAltitude)
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // 사용 안 함
-    }
-
-    private fun saveAndUpdateWidget(currentAltitude: Float) {
-        val prefs = getSharedPreferences(
-            AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE
-        )
-
-        // 이전 고도를 현재 고도로 교체 저장
-        val prevAltitude: Float? =
-            if (prefs.contains(AltitudeWidgetProvider.KEY_CURRENT_ALTITUDE))
-                prefs.getFloat(AltitudeWidgetProvider.KEY_CURRENT_ALTITUDE, 0f)
-            else null
-
-        prefs.edit().apply {
-            prevAltitude?.let { putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, it) }
-            putFloat(AltitudeWidgetProvider.KEY_CURRENT_ALTITUDE, currentAltitude)
-            apply()
+            return
         }
 
-        // 상태표시줄 알림 갱신
-        val change = if (prevAltitude != null) currentAltitude - prevAltitude else null
-        val msg = AltitudeWidgetProvider.getActionRecommendation(change)
-        updateForegroundNotification("고도: ${"%,.0f".format(currentAltitude)}m  $msg")
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, buildNotification())
 
-        // 위젯 UI 갱신
-        AltitudeWidgetProvider.updateAllWidgets(this)
-    }
-
-    private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "고도 모니터링",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Ear Barotrauma 예방을 위한 고도 모니터링 알림"
-        }
-        getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(channel)
-    }
-
-    private fun buildNotification(text: String): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Altitude Widget")
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
-    }
-
-    private fun updateForegroundNotification(text: String) {
-        getSystemService(NotificationManager::class.java)
-            .notify(NOTIFICATION_ID, buildNotification(text))
+        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        handler.post(updateRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        sensorManager.unregisterListener(this)
-        handler.removeCallbacksAndMessages(null)
+        handler.removeCallbacks(updateRunnable)
+        if (pressureSensor != null) {
+            sensorManager.unregisterListener(this)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        return START_STICKY
+    }
+
+    // ============ 센서 콜백 ============
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        event ?: return
+        if (event.sensor.type != Sensor.TYPE_PRESSURE) return
+
+        val pressureHpa = event.values[0]
+        val rawAltitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa)
+
+        // 이동평균 적용
+        if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
+        altitudeBuffer.addLast(rawAltitude)
+        latestSmoothedAltitude = altitudeBuffer.average().toFloat()
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    // ============ 데이터 저장 & 위젯 갱신 ============
+
+    private fun saveAndUpdate() {
+        if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
+
+        val prefs = getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+        val prevAltitude = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE)
+        val now = System.currentTimeMillis()
+
+        // 5분 윈도우에 현재 고도 추가
+        altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
+
+        // 5분 이전 데이터 제거
+        while (altitudeHistory.isNotEmpty() &&
+            now - altitudeHistory.first().first > WINDOW_DURATION_MS) {
+            altitudeHistory.removeFirst()
+        }
+
+        // 5분 누적 변화량
+        val accumulatedChange = if (altitudeHistory.size >= 2) {
+            latestSmoothedAltitude - altitudeHistory.first().second
+        } else 0f
+
+        prefs.edit()
+            .putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, prevAltitude)
+            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, latestSmoothedAltitude)
+            .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulatedChange)
+            .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
+            .apply()
+
+        AltitudeWidgetProvider.updateWidgets(this)
+    }
+
+    // ============ 알림 ============
+
+    private fun createNotificationChannel() {
+        val channelName = getString(R.string.channel_name)
+        val channelDesc = getString(R.string.channel_description)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            channelName,
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = channelDesc
+        }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun buildNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.notification_title))
+            .setContentText(getString(R.string.notification_text))
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+    }
 }
