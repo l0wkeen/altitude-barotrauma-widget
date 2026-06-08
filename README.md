@@ -33,7 +33,7 @@
 app/src/main/
 ├── res/
 │   ├── drawable/
-│   │   └── widget_background.xml   # 반투명 다크 둥규마니 배경
+│   │   └── widget_background.xml   # 반투명 다크 둥근 모서리 배경
 │   ├── layout/
 │   │   └── widget_altitude.xml     # 위젯 UI 레이아웃
 │   ├── values/
