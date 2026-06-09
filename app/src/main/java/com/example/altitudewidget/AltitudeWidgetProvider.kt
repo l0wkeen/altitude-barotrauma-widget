@@ -116,7 +116,6 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         for (widgetId in appWidgetIds) {
             updateWidget(context, appWidgetManager, widgetId)
         }
-        // 즉시 1회 서비스 시작
         WorkManager.getInstance(context).enqueue(
             OneTimeWorkRequestBuilder<AltitudeWorker>().build()
         )
@@ -125,7 +124,6 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        // 위젯 최초 추가 시 즉시 서비스 시작
         WorkManager.getInstance(context).enqueue(
             OneTimeWorkRequestBuilder<AltitudeWorker>().build()
         )
@@ -135,6 +133,5 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         AltitudeWorker.cancelWork(context)
-        context.stopService(Intent(context, AltitudeService::class.java))
     }
 }
