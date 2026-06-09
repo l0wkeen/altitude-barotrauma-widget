@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.RemoteViews
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import kotlin.math.abs
 
 class AltitudeWidgetProvider : AppWidgetProvider() {
@@ -114,11 +116,19 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         for (widgetId in appWidgetIds) {
             updateWidget(context, appWidgetManager, widgetId)
         }
+        // 즉시 1회 서비스 시작
+        WorkManager.getInstance(context).enqueue(
+            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
+        )
         AltitudeWorker.schedulePeriodicWork(context)
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
+        // 위젯 최초 추가 시 즉시 서비스 시작
+        WorkManager.getInstance(context).enqueue(
+            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
+        )
         AltitudeWorker.schedulePeriodicWork(context)
     }
 
