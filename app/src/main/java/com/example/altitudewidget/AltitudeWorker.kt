@@ -1,5 +1,6 @@
 package com.example.altitudewidget
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -17,10 +18,13 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // Foreground로 승격 → 포그라운드 앱처럼 센서 접근 가능
+        setForeground(createForegroundInfo())
+
         return withContext(Dispatchers.IO) {
             val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-            // Wakeup 센서 우선, 없으면 일반 센서로 fallback
+            // Wakeup 센서 우선, 없으면 일반 센서 fallback
             val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE, true)
                 ?: sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
@@ -42,7 +46,7 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
             sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
 
             val pressure = try {
-                withTimeoutOrNull(5000L) { deferred.await() }
+                withTimeoutOrNull(8000L) { deferred.await() }
             } finally {
                 sensorManager.unregisterListener(listener)
             }
@@ -73,25 +77,35 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
                 .apply()
 
             AltitudeWidgetProvider.updateWidgets(context)
-
-            // 알림 발송
-            sendNotificationIfNeeded(context, accumulated)
+            sendAlertNotificationIfNeeded(context, accumulated)
 
             Result.success()
         }
     }
 
-    private fun sendNotificationIfNeeded(context: Context, accumulated: Float) {
+    private fun createForegroundInfo(): ForegroundInfo {
+        val channelId = "altitude_measuring"
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(
+            NotificationChannel(channelId, "고도 측정 중", NotificationManager.IMPORTANCE_LOW)
+        )
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setContentTitle("고도 측정 중...")
+            .setOngoing(true)
+            .build()
+        return ForegroundInfo(1000, notification)
+    }
+
+    private fun sendAlertNotificationIfNeeded(context: Context, accumulated: Float) {
         val absChange = abs(accumulated)
-        if (absChange < 15f) return  // 15m 미만이면 알림 없음
+        if (absChange < 15f) return
 
         val channelId = "altitude_alert"
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val channel = NotificationChannel(
-            channelId, "고도 변화 알림", NotificationManager.IMPORTANCE_HIGH
-        ).apply { description = "귀 압력 변화 경고" }
-        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(
+            NotificationChannel(channelId, "고도 변화 알림", NotificationManager.IMPORTANCE_HIGH)
+        )
 
         val (title, body) = when {
             absChange >= 50f -> Pair("🚨 귀 먹먹함 심각", "발살바법을 시도하세요 (코 막고 코 풀기)")
@@ -100,7 +114,7 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
         }
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -116,6 +130,7 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
         fun schedulePeriodicWork(context: Context) {
             val request = PeriodicWorkRequestBuilder<AltitudeWorker>(15, TimeUnit.MINUTES)
                 .addTag(WORK_TAG)
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_TAG,
