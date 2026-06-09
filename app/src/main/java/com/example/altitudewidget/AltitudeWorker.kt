@@ -1,6 +1,5 @@
 package com.example.altitudewidget
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -8,6 +7,8 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.work.*
 import kotlinx.coroutines.*
@@ -18,69 +19,69 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        // Foreground로 승격 → 포그라운드 앱처럼 센서 접근 가능
         setForeground(createForegroundInfo())
 
-        return withContext(Dispatchers.IO) {
-            val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE, true)
+            ?: sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
-            // Wakeup 센서 우선, 없으면 일반 센서 fallback
-            val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE, true)
-                ?: sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
-
-            if (pressureSensor == null) {
-                context.getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit().putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, false).apply()
-                AltitudeWidgetProvider.updateWidgets(context)
-                return@withContext Result.success()
-            }
-
-            val deferred = CompletableDeferred<Float>()
-            val listener = object : SensorEventListener {
-                override fun onSensorChanged(event: SensorEvent) {
-                    if (!deferred.isCompleted) deferred.complete(event.values[0])
-                }
-                override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
-            }
-
-            sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
-
-            val pressure = try {
-                withTimeoutOrNull(8000L) { deferred.await() }
-            } finally {
-                sensorManager.unregisterListener(listener)
-            }
-
-            if (pressure == null) return@withContext Result.retry()
-
-            val altitude = SensorManager.getAltitude(
-                SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure
-            )
-
-            val prefs = context.getSharedPreferences(
-                AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE
-            )
-            val prevAltitude = prefs.getFloat(
-                AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE
-            )
-            val prevAccumulated = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
-
-            val immediateChange = if (prevAltitude != AltitudeWidgetProvider.INVALID_ALTITUDE)
-                altitude - prevAltitude else 0f
-            val accumulated = prevAccumulated + immediateChange
-
-            prefs.edit()
-                .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
-                .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, altitude)
-                .putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, prevAltitude)
-                .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulated)
-                .apply()
-
+        if (pressureSensor == null) {
+            context.getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, false).apply()
             AltitudeWidgetProvider.updateWidgets(context)
-            sendAlertNotificationIfNeeded(context, accumulated)
-
-            Result.success()
+            return Result.success()
         }
+
+        val deferred = CompletableDeferred<Float>()
+        val mainHandler = Handler(Looper.getMainLooper())
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                if (!deferred.isCompleted) deferred.complete(event.values[0])
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+        }
+
+        // 메인 스레드 Handler로 등록 → Looper 있어서 콜백 정상 수신
+        mainHandler.post {
+            sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL, mainHandler)
+        }
+
+        val pressure = try {
+            withTimeoutOrNull(8000L) { deferred.await() }
+        } finally {
+            sensorManager.unregisterListener(listener)
+        }
+
+        if (pressure == null) return Result.retry()
+
+        val altitude = SensorManager.getAltitude(
+            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure
+        )
+
+        val prefs = context.getSharedPreferences(
+            AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE
+        )
+        val prevAltitude = prefs.getFloat(
+            AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE
+        )
+        val prevAccumulated = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
+
+        val immediateChange = if (prevAltitude != AltitudeWidgetProvider.INVALID_ALTITUDE)
+            altitude - prevAltitude else 0f
+        val accumulated = prevAccumulated + immediateChange
+
+        prefs.edit()
+            .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
+            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, altitude)
+            .putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, prevAltitude)
+            .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulated)
+            .apply()
+
+        AltitudeWidgetProvider.updateWidgets(context)
+        sendAlertNotificationIfNeeded(context, accumulated)
+
+        return Result.success()
     }
 
     private fun createForegroundInfo(): ForegroundInfo {
