@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.RemoteViews
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import kotlin.math.abs
 
@@ -118,7 +117,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
             updateWidget(context, appWidgetManager, widgetId)
         }
         WorkManager.getInstance(context).enqueue(
-            OneTimeWorkRequestBuilder<AltitudeWorker>().setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
+            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
         )
         AltitudeWorker.schedulePeriodicWork(context)
     }
@@ -126,7 +125,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         WorkManager.getInstance(context).enqueue(
-            OneTimeWorkRequestBuilder<AltitudeWorker>().setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST).build()
+            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
         )
         AltitudeWorker.schedulePeriodicWork(context)
     }
