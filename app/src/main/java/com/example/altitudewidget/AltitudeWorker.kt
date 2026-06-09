@@ -1,13 +1,17 @@
 package com.example.altitudewidget
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import androidx.core.app.NotificationCompat
 import androidx.work.*
 import kotlinx.coroutines.*
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
@@ -15,7 +19,10 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     override suspend fun doWork(): Result {
         return withContext(Dispatchers.IO) {
             val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
-            val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
+
+            // Wakeup 센서 우선, 없으면 일반 센서로 fallback
+            val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE, true)
+                ?: sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
 
             if (pressureSensor == null) {
                 context.getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
@@ -35,7 +42,7 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
             sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
 
             val pressure = try {
-                withTimeoutOrNull(3000L) { deferred.await() }
+                withTimeoutOrNull(5000L) { deferred.await() }
             } finally {
                 sensorManager.unregisterListener(listener)
             }
@@ -66,8 +73,41 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
                 .apply()
 
             AltitudeWidgetProvider.updateWidgets(context)
+
+            // 알림 발송
+            sendNotificationIfNeeded(context, accumulated)
+
             Result.success()
         }
+    }
+
+    private fun sendNotificationIfNeeded(context: Context, accumulated: Float) {
+        val absChange = abs(accumulated)
+        if (absChange < 15f) return  // 15m 미만이면 알림 없음
+
+        val channelId = "altitude_alert"
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val channel = NotificationChannel(
+            channelId, "고도 변화 알림", NotificationManager.IMPORTANCE_HIGH
+        ).apply { description = "귀 압력 변화 경고" }
+        nm.createNotificationChannel(channel)
+
+        val (title, body) = when {
+            absChange >= 50f -> Pair("🚨 귀 먹먹함 심각", "발살바법을 시도하세요 (코 막고 코 풀기)")
+            absChange >= 30f -> Pair("⚠️ 귀 먹먹함 주의", "하품하거나 침을 삼켜보세요")
+            else             -> Pair("💧 귀 압력 변화 감지", "물을 마시거나 하품해 보세요")
+        }
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(1001, notification)
     }
 
     companion object {
