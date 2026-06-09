@@ -42,7 +42,6 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
         }
 
-        // 메인 스레드 Handler로 등록 → Looper 있어서 콜백 정상 수신
         mainHandler.post {
             sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL, mainHandler)
         }
@@ -129,9 +128,9 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
         private const val WORK_TAG = "altitude_periodic_work"
 
         fun schedulePeriodicWork(context: Context) {
+            // PeriodicWorkRequest는 setExpedited 불가 → 제거
             val request = PeriodicWorkRequestBuilder<AltitudeWorker>(15, TimeUnit.MINUTES)
                 .addTag(WORK_TAG)
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 WORK_TAG,
