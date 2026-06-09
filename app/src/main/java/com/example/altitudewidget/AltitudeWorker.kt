@@ -19,8 +19,6 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        setForeground(createForegroundInfo())
-
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val pressureSensor = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE, true)
             ?: sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE)
@@ -42,8 +40,12 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
             override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
         }
 
+        // 메인 스레드 Handler로 등록해야 onSensorChanged 콜백 수신 가능
         mainHandler.post {
-            sensorManager.registerListener(listener, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL, mainHandler)
+            sensorManager.registerListener(
+                listener, pressureSensor,
+                SensorManager.SENSOR_DELAY_NORMAL, mainHandler
+            )
         }
 
         val pressure = try {
@@ -83,20 +85,6 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
         return Result.success()
     }
 
-    private fun createForegroundInfo(): ForegroundInfo {
-        val channelId = "altitude_measuring"
-        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(channelId, "고도 측정 중", NotificationManager.IMPORTANCE_LOW)
-        )
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("고도 측정 중...")
-            .setOngoing(true)
-            .build()
-        return ForegroundInfo(1000, notification)
-    }
-
     private fun sendAlertNotificationIfNeeded(context: Context, accumulated: Float) {
         val absChange = abs(accumulated)
         if (absChange < 15f) return
@@ -128,7 +116,6 @@ class AltitudeWorker(private val context: Context, params: WorkerParameters) :
         private const val WORK_TAG = "altitude_periodic_work"
 
         fun schedulePeriodicWork(context: Context) {
-            // PeriodicWorkRequest는 setExpedited 불가 → 제거
             val request = PeriodicWorkRequestBuilder<AltitudeWorker>(15, TimeUnit.MINUTES)
                 .addTag(WORK_TAG)
                 .build()
