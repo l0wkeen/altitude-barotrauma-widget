@@ -17,9 +17,9 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
     companion object {
         const val PREFS_NAME = "AltitudePrefs"
         const val KEY_ALTITUDE = "current_altitude"
-        const val KEY_PREV_ALTITUDE = "prev_altitude"
         const val KEY_ACCUMULATED_CHANGE = "accumulated_change"
         const val KEY_HAS_SENSOR = "has_sensor"
+        const val KEY_IS_WARMING_UP = "is_warming_up"  // 워밍업 상태 플래그
         const val INVALID_ALTITUDE = Float.MIN_VALUE
 
         fun updateWidgets(context: Context) {
@@ -38,8 +38,8 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
             val hasSensor = prefs.getBoolean(KEY_HAS_SENSOR, true)
             val currentAltitude = prefs.getFloat(KEY_ALTITUDE, INVALID_ALTITUDE)
-            val prevAltitude = prefs.getFloat(KEY_PREV_ALTITUDE, INVALID_ALTITUDE)
             val accumulatedChange = prefs.getFloat(KEY_ACCUMULATED_CHANGE, 0f)
+            val isWarmingUp = prefs.getBoolean(KEY_IS_WARMING_UP, true)
 
             val views = RemoteViews(context.packageName, R.layout.widget_altitude)
 
@@ -69,14 +69,20 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
             }
 
             val altitudeText = context.getString(R.string.altitude_format, currentAltitude)
-            val immediateChange = if (prevAltitude != INVALID_ALTITUDE)
-                currentAltitude - prevAltitude else 0f
-            val changeText = context.getString(
-                R.string.change_accumulated_format,
-                accumulatedChange,
-                immediateChange
-            )
-            val (actionMessage, actionColor) = getActionRecommendation(context, accumulatedChange)
+
+            // 누적 변화량만 사용 (워밍업 중에는 초기화 메시지 표시)
+            val changeText = if (isWarmingUp) {
+                context.getString(R.string.action_initializing)
+            } else {
+                context.getString(R.string.change_accumulated_format, accumulatedChange)
+            }
+
+            val (actionMessage, actionColor) = if (isWarmingUp) {
+                Pair(context.getString(R.string.action_initializing),
+                    context.getColor(android.R.color.white))
+            } else {
+                getActionRecommendation(context, accumulatedChange)
+            }
 
             views.setTextViewText(R.id.text_altitude, altitudeText)
             views.setTextViewText(R.id.text_altitude_change, changeText)
@@ -89,21 +95,19 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         private fun getActionRecommendation(context: Context, change: Float): Pair<String, Int> {
             val absChange = abs(change)
             return when {
-                absChange == 0f ->
-                    Pair(context.getString(R.string.action_initializing),
-                        context.getColor(android.R.color.white))
+                // absChange == 0f 일 때 정상 표시 (이전에는 초기화 중으로 잘못 표시됨)
+                absChange < 15f ->
+                    Pair(context.getString(R.string.action_normal),
+                        context.getColor(android.R.color.holo_green_light))
                 absChange >= 50f ->
                     Pair(context.getString(R.string.action_valsalva),
                         context.getColor(android.R.color.holo_red_light))
                 absChange >= 30f ->
                     Pair(context.getString(R.string.action_yawn),
                         context.getColor(android.R.color.holo_orange_light))
-                absChange >= 15f ->
+                else ->
                     Pair(context.getString(R.string.action_drink),
                         context.getColor(android.R.color.holo_blue_light))
-                else ->
-                    Pair(context.getString(R.string.action_normal),
-                        context.getColor(android.R.color.holo_green_light))
             }
         }
     }

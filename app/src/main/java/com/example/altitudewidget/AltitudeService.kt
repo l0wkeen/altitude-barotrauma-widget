@@ -19,14 +19,11 @@ import kotlin.math.abs
 /**
  * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service
  *
- * - TYPE_PRESSURE 센서로 기압(hPa) 측정
- * - SensorManager.getAltitude()로 해발고도 계산
- * - 이동평균 5개 샘플로 노이즈 제거
- * - 3초 간격으로 위젯 갱신
- * - 1분 슬라이딩 윈도우로 누적 변화량 계산
- * - 서비스 시작 시 누적 변화량 리셋 (이전 세션 잔류값 제거)
- * - 워밍업 기간(3개 샘플 미만)에는 변화량 0으로 표시
- * - 누적 변화량 기준 3단계 귀 압력 알림 (15m / 30m / 50m)
+ * 변화량 실시간 반영 설계:
+ * - accumulatedChange = (1분 윈도우 내 마지막 고도) - (첫 고도)
+ * - 3초마다 유일하게 계산하여 저장 → 위젯 갱신
+ * - immediateChange 제거: 3초치 데이터를 위젯에 보여주지 않음
+ * - 워밍업(3개 샘플 미만) 동안 KEY_IS_WARMING_UP = true 포함
  */
 class AltitudeService : Service(), SensorEventListener {
 
@@ -38,7 +35,6 @@ class AltitudeService : Service(), SensorEventListener {
         private const val UPDATE_INTERVAL_MS = 3_000L
         private const val WINDOW_DURATION_MS = 60_000L
         private const val MOVING_AVG_SIZE = 5
-        // 워밍업: 어떤 연산이든 샘플이 3개 이상 쳄여야 변화량 유의미
         private const val WARMUP_SAMPLES = 3
 
         private const val ALERT_NONE = 0
@@ -78,11 +74,11 @@ class AltitudeService : Service(), SensorEventListener {
             return
         }
 
-        // 서비스 시작 시 누적 변화량 리셋
-        // 이전 세션의 잔류값이 초기값 35m 버그의 원인
+        // 서비스 시작 시 누적 변화량 리셋 + 워밍업 플래그 설정
         getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
+            .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, true)
             .apply()
 
         createNotificationChannels()
@@ -123,12 +119,9 @@ class AltitudeService : Service(), SensorEventListener {
     private fun saveAndUpdate() {
         if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
 
-        val prefs = getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-        val prevAltitude = prefs.getFloat(
-            AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE
-        )
         val now = System.currentTimeMillis()
 
+        // 1분 윈도우에 현재 고도 추가
         altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
 
         // 1분 이전 데이터 제거
@@ -137,31 +130,31 @@ class AltitudeService : Service(), SensorEventListener {
             altitudeHistory.removeFirst()
         }
 
-        // 워밍업 기간(샘플 3개 미만):
-        // 엘리시에서 목록 첫 값과의 차이가 연산되는 시점이라
-        // 시작 직후 잠시동안 센서 노이즈로 인한 이상값이 나타날 수 있음
-        val accumulatedChange = if (altitudeHistory.size >= WARMUP_SAMPLES) {
+        val isWarmingUp = altitudeHistory.size < WARMUP_SAMPLES
+
+        // 워밍업 중에는 0f, 이후에는 1분 윈도우 첫값과의 리얼타임 차이
+        val accumulatedChange = if (!isWarmingUp) {
             latestSmoothedAltitude - altitudeHistory.first().second
         } else {
             0f
         }
 
-        prefs.edit()
-            .putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, prevAltitude)
+        getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, latestSmoothedAltitude)
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulatedChange)
             .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
+            .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, isWarmingUp)
             .apply()
 
         AltitudeWidgetProvider.updateWidgets(this)
-        sendAlertIfNeeded(accumulatedChange)
+        if (!isWarmingUp) sendAlertIfNeeded(accumulatedChange)
     }
 
     // ============ 귀 압력 알림 ============
 
     private fun sendAlertIfNeeded(accumulatedChange: Float) {
         val absChange = abs(accumulatedChange)
-
         val currentLevel = when {
             absChange >= 50f -> ALERT_LEVEL_3
             absChange >= 30f -> ALERT_LEVEL_2
@@ -169,10 +162,7 @@ class AltitudeService : Service(), SensorEventListener {
             else             -> ALERT_NONE
         }
 
-        if (currentLevel == ALERT_NONE) {
-            lastAlertLevel = ALERT_NONE
-            return
-        }
+        if (currentLevel == ALERT_NONE) { lastAlertLevel = ALERT_NONE; return }
         if (currentLevel <= lastAlertLevel) return
         lastAlertLevel = currentLevel
 
@@ -183,14 +173,15 @@ class AltitudeService : Service(), SensorEventListener {
         }
 
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-        nm.notify(ALERT_NOTIFICATION_ID, notification)
+        nm.notify(ALERT_NOTIFICATION_ID,
+            NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+        )
     }
 
     // ============ 알림 채널 ============
