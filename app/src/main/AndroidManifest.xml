@@ -37,5 +37,10 @@
             </intent-filter>
         </receiver>
 
+        <service
+            android:name=".AltitudeService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
     </application>
 </manifest>
