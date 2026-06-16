@@ -1,0 +1,28 @@
+R_DEF: Internal format may change without notice
+local
+drawable action_bg
+drawable widget_background
+id text_action
+id text_altitude
+id text_altitude_change
+id widget_root
+layout widget_altitude
+string action_drink
+string action_initializing
+string action_normal
+string action_valsalva
+string action_yawn
+string altitude_format
+string altitude_measuring
+string app_name
+string change_accumulated_format
+string change_no_data
+string channel_description
+string channel_name
+string no_sensor
+string notification_text
+string notification_title
+string widget_description
+string widget_label
+style Theme.AltitudeWidget
+xml altitude_widget_info

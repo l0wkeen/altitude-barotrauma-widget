@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_drink">물을 조금 마세요</string>
+    <string name="action_initializing">센서 초기화 중…</string>
+    <string name="action_normal">✅ 고도 변화 정상</string>
+    <string name="action_valsalva">⚠️ 의사: 발살바 방법 시도</string>
+    <string name="action_yawn">하품 또는 침 삼키기</string>
+    <string name="altitude_format">%,.0f m</string>
+    <string name="altitude_measuring">측정 중…</string>
+    <string name="app_name">Altitude Widget</string>
+    <string name="change_accumulated_format">1분: %+.1f m | 3초: %+.1f m</string>
+    <string name="change_no_data">변화량: 측정 중…</string>
+    <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
+    <string name="channel_name">고도 모니터링</string>
+    <string name="no_sensor">기압 센서 없음</string>
+    <string name="notification_text">기압 센서로 고도 변화를 추적합니다</string>
+    <string name="notification_title">고도 모니터링 중</string>
+    <string name="widget_description">Ear Barotrauma 예방 알림 위젯</string>
+    <string name="widget_label">🧱 고도 모니터</string>
+    <style name="Theme.AltitudeWidget" parent="android:Theme.DeviceDefault"/>
+</resources>
