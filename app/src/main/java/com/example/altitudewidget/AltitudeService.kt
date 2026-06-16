@@ -89,7 +89,7 @@ class AltitudeService : Service(), SensorEventListener {
         createNotificationChannels()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
-        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_UI)
         handler.post(updateRunnable)
     }
 
@@ -124,7 +124,7 @@ class AltitudeService : Service(), SensorEventListener {
                 .edit()
                 .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, false)
                 .apply()
-            handler.post { saveAndUpdate() }
+            saveAndUpdate()
         }
     }
 
