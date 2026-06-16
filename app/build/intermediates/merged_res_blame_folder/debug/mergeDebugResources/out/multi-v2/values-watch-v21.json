@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.altitudewidget.app-mergeDebugResources-28:/values-watch-v21/values-watch-v21.xml",
+            "outputFile": "com.example.altitudewidget.app-mergeDebugResources-21:/values-watch-v21/values-watch-v21.xml",
             "map": [
                 {
                     "source": "C:\\Users\\ps250\\.gradle\\caches\\9.4.1\\transforms\\e4be0ab9152fb6c5f6203dfa2887b9ec\\transformed\\appcompat-1.7.0\\res\\values-watch-v21\\values-watch-v21.xml",

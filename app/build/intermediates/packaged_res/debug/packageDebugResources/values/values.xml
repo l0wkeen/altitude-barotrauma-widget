@@ -8,7 +8,7 @@
     <string name="altitude_format">%,.0f m</string>
     <string name="altitude_measuring">측정 중…</string>
     <string name="app_name">Altitude Widget</string>
-    <string name="change_accumulated_format">1분: %+.1f m | 3초: %+.1f m</string>
+    <string name="change_accumulated_format">1분 누적: %+.1f m</string>
     <string name="change_no_data">변화량: 측정 중…</string>
     <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
     <string name="channel_name">고도 모니터링</string>

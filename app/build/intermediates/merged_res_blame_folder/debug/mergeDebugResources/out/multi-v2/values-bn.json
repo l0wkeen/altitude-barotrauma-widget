@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.altitudewidget.app-mergeDebugResources-28:/values-bn/values-bn.xml",
+            "outputFile": "com.example.altitudewidget.app-mergeDebugResources-21:/values-bn/values-bn.xml",
             "map": [
                 {
                     "source": "C:\\Users\\ps250\\.gradle\\caches\\9.4.1\\transforms\\d27993e59f00df634fe342aa7d9ccbdb\\transformed\\core-1.13.1\\res\\values-bn\\values-bn.xml",

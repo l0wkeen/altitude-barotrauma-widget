@@ -15,24 +15,17 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlin.math.abs
 
 /** 고도 히스토리 포인트 — Pair<Long,Float> 오토박싱 제거 */
 private data class AltitudePoint(val timeMs: Long, val altitudeM: Float)
 
-/**
- * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service.
- *
- * 위젯 호환성 체크리스트:
- * - RemoteViews 관련 코드 없음 (AltitudeWidgetProvider 담당)
- * - startForeground() → API 분기로 Android 14+ 대응
- * - START_STICKY → 시스템 킬 후 자동 재시작
- * - SENSOR_DELAY_NORMAL → 불필요한 고빈도 샘플링 제거, 배터리 절약
- */
 class AltitudeService : Service(), SensorEventListener {
 
     companion object {
+        private const val TAG = "AltitudeService"
         private const val CHANNEL_ID = "altitude_channel"
         private const val ALERT_CHANNEL_ID = "altitude_alert"
         private const val NOTIFICATION_ID = 1
@@ -100,10 +93,12 @@ class AltitudeService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, buildForegroundNotification())
         }
 
-        // SENSOR_DELAY_NORMAL(~200ms): 3초 이동평균 특성상 SENSOR_DELAY_UI(~60ms)와
-        // 정확도 차이 없음. 샘플링 빈도를 낮춰 배터리 소모 절약.
-        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // SENSOR_DELAY_UI (~60ms) 로 변경하여 첫 응답 속도 최적화
+        val registered = sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_UI)
+        Log.d(TAG, "Sensor registration status: $registered")
+        
         handler.post(updateRunnable)
+        Log.d(TAG, "Service Created and updateRunnable started")
     }
 
     override fun onDestroy() {
@@ -122,9 +117,13 @@ class AltitudeService : Service(), SensorEventListener {
         event ?: return
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
 
+        val pressure = event.values[0]
         val rawAltitude = SensorManager.getAltitude(
-            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, event.values[0]
+            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure
         )
+        
+        Log.d(TAG, "Sensor raw value: $pressure, Altitude: $rawAltitude")
+
         if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
         altitudeBuffer.addLast(rawAltitude)
         latestSmoothedAltitude = altitudeBuffer.average().toFloat()
