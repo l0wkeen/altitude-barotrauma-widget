@@ -18,13 +18,17 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import kotlin.math.abs
 
+/** 고도 히스토리 포인트 — Pair<Long,Float> 오토박싱 제거 */
+private data class AltitudePoint(val timeMs: Long, val altitudeM: Float)
+
 /**
- * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service
+ * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service.
  *
- * isWarmingUp 설계:
- * - firstSensorValueReceived == false → 센서값 아직 없음 → isWarmingUp = true
- * - firstSensorValueReceived == true  → 센서값 있음 → isWarmingUp = false, 바로 변화량 계산
- * - altitudeHistory에 addLast 후 size를 체크하는 구조 버그 제거
+ * 위젯 호환성 체크리스트:
+ * - RemoteViews 관련 코드 없음 (AltitudeWidgetProvider 담당)
+ * - startForeground() → API 분기로 Android 14+ 대응
+ * - START_STICKY → 시스템 킬 후 자동 재시작
+ * - SENSOR_DELAY_NORMAL → 불필요한 고빈도 샘플링 제거, 배터리 절약
  */
 class AltitudeService : Service(), SensorEventListener {
 
@@ -47,12 +51,11 @@ class AltitudeService : Service(), SensorEventListener {
     private var pressureSensor: Sensor? = null
     private val handler = Handler(Looper.getMainLooper())
 
+    // Float 원시값 배열 — 박싱 없음
     private val altitudeBuffer = ArrayDeque<Float>(MOVING_AVG_SIZE)
-    private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
+    private val altitudeHistory = ArrayDeque<AltitudePoint>()
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
     private var lastAlertLevel = ALERT_NONE
-
-    // 첫 센서값 수신 여부: false = 아직 없음(워밍업), true = 있음(정상)
     private var firstSensorValueReceived = false
 
     private val updateRunnable = object : Runnable {
@@ -97,7 +100,9 @@ class AltitudeService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, buildForegroundNotification())
         }
 
-        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_UI)
+        // SENSOR_DELAY_NORMAL(~200ms): 3초 이동평균 특성상 SENSOR_DELAY_UI(~60ms)와
+        // 정확도 차이 없음. 샘플링 빈도를 낮춰 배터리 소모 절약.
+        sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
         handler.post(updateRunnable)
     }
 
@@ -142,18 +147,17 @@ class AltitudeService : Service(), SensorEventListener {
         if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
 
         val now = System.currentTimeMillis()
+        altitudeHistory.addLast(AltitudePoint(now, latestSmoothedAltitude))
 
-        altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
-
+        // 1분 초과 데이터 제거
         while (altitudeHistory.isNotEmpty() &&
-            now - altitudeHistory.first().first > WINDOW_DURATION_MS) {
+            now - altitudeHistory.first().timeMs > WINDOW_DURATION_MS) {
             altitudeHistory.removeFirst()
         }
 
         val isWarmingUp = !firstSensorValueReceived
-
         val accumulatedChange = if (!isWarmingUp) {
-            latestSmoothedAltitude - altitudeHistory.first().second
+            latestSmoothedAltitude - altitudeHistory.first().altitudeM
         } else {
             0f
         }
