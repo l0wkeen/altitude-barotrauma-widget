@@ -6,10 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -75,19 +77,25 @@ class AltitudeService : Service(), SensorEventListener {
             return
         }
 
-        // 서비스 시작 시 리셋
-        // KEY_IS_WARMING_UP은 여기서 true로 설정하지 않음
-        // → firstSensorValueReceived 인메모리 플래그로 제어하므로
-        //   onCreate 재호출 시에도 안전하게 작동
         firstSensorValueReceived = false
         getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
-            .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, true)  // 센서값 도착 전에만 true
+            .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, true)
             .apply()
 
         createNotificationChannels()
-        startForeground(NOTIFICATION_ID, buildForegroundNotification())
+
+        // Android 14(API 34)+ 에서는 foregroundServiceType 명시 필수
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID,
+                buildForegroundNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, buildForegroundNotification())
+        }
 
         sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_UI)
         handler.post(updateRunnable)
@@ -116,10 +124,8 @@ class AltitudeService : Service(), SensorEventListener {
         altitudeBuffer.addLast(rawAltitude)
         latestSmoothedAltitude = altitudeBuffer.average().toFloat()
 
-        // 첫 값 도착 즉시: isWarmingUp = false로 전환 + 위젯 즉시 갱신
         if (!firstSensorValueReceived) {
             firstSensorValueReceived = true
-            // KEY_IS_WARMING_UP을 즉시 false로 저장
             getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, false)
@@ -139,14 +145,11 @@ class AltitudeService : Service(), SensorEventListener {
 
         altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
 
-        // 1분 이전 데이터 제거
         while (altitudeHistory.isNotEmpty() &&
             now - altitudeHistory.first().first > WINDOW_DURATION_MS) {
             altitudeHistory.removeFirst()
         }
 
-        // isWarmingUp은 firstSensorValueReceived로 제어
-        // (altitudeHistory.size 체크 불필요: addLast 후에는 항상 1 이상)
         val isWarmingUp = !firstSensorValueReceived
 
         val accumulatedChange = if (!isWarmingUp) {
