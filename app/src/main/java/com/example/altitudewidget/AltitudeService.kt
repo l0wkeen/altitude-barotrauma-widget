@@ -24,6 +24,8 @@ import kotlin.math.abs
  * - 이동평균 5개 샘플로 노이즈 제거
  * - 3초 간격으로 위젯 갱신
  * - 1분 슬라이딩 윈도우로 누적 변화량 계산
+ * - 서비스 시작 시 누적 변화량 리셋 (이전 세션 잔류값 제거)
+ * - 워밍업 기간(3개 샘플 미만)에는 변화량 0으로 표시
  * - 누적 변화량 기준 3단계 귀 압력 알림 (15m / 30m / 50m)
  */
 class AltitudeService : Service(), SensorEventListener {
@@ -36,30 +38,24 @@ class AltitudeService : Service(), SensorEventListener {
         private const val UPDATE_INTERVAL_MS = 3_000L
         private const val WINDOW_DURATION_MS = 60_000L
         private const val MOVING_AVG_SIZE = 5
+        // 워밍업: 어떤 연산이든 샘플이 3개 이상 쳄여야 변화량 유의미
+        private const val WARMUP_SAMPLES = 3
 
-        // 알림 단계 (중복 방지용)
         private const val ALERT_NONE = 0
-        private const val ALERT_LEVEL_1 = 1   // 15m 이상
-        private const val ALERT_LEVEL_2 = 2   // 30m 이상
-        private const val ALERT_LEVEL_3 = 3   // 50m 이상
+        private const val ALERT_LEVEL_1 = 1
+        private const val ALERT_LEVEL_2 = 2
+        private const val ALERT_LEVEL_3 = 3
     }
 
     private lateinit var sensorManager: SensorManager
     private var pressureSensor: Sensor? = null
     private val handler = Handler(Looper.getMainLooper())
 
-    // 이동평균 버퍼
     private val altitudeBuffer = ArrayDeque<Float>(MOVING_AVG_SIZE)
-
-    // 1분 슬라이딩 윈도우
     private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
-
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
-
-    // 마지막으로 발송한 알림 단계 (같은 단계 중복 발송 방지)
     private var lastAlertLevel = ALERT_NONE
 
-    // 3초마다 위젯 갱신 Runnable
     private val updateRunnable = object : Runnable {
         override fun run() {
             saveAndUpdate()
@@ -82,6 +78,13 @@ class AltitudeService : Service(), SensorEventListener {
             return
         }
 
+        // 서비스 시작 시 누적 변화량 리셋
+        // 이전 세션의 잔류값이 초기값 35m 버그의 원인
+        getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
+            .apply()
+
         createNotificationChannels()
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
@@ -92,16 +95,12 @@ class AltitudeService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(updateRunnable)
-        if (pressureSensor != null) {
-            sensorManager.unregisterListener(this)
-        }
+        if (pressureSensor != null) sensorManager.unregisterListener(this)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     // ============ 센서 콜백 ============
 
@@ -109,12 +108,9 @@ class AltitudeService : Service(), SensorEventListener {
         event ?: return
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
 
-        val pressureHpa = event.values[0]
         val rawAltitude = SensorManager.getAltitude(
-            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa
+            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, event.values[0]
         )
-
-        // 이동평균 적용
         if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
         altitudeBuffer.addLast(rawAltitude)
         latestSmoothedAltitude = altitudeBuffer.average().toFloat()
@@ -133,7 +129,6 @@ class AltitudeService : Service(), SensorEventListener {
         )
         val now = System.currentTimeMillis()
 
-        // 1분 윈도우에 현재 고도 추가
         altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
 
         // 1분 이전 데이터 제거
@@ -142,10 +137,14 @@ class AltitudeService : Service(), SensorEventListener {
             altitudeHistory.removeFirst()
         }
 
-        // 1분 누적 변화량
-        val accumulatedChange = if (altitudeHistory.size >= 2) {
+        // 워밍업 기간(샘플 3개 미만):
+        // 엘리시에서 목록 첫 값과의 차이가 연산되는 시점이라
+        // 시작 직후 잠시동안 센서 노이즈로 인한 이상값이 나타날 수 있음
+        val accumulatedChange = if (altitudeHistory.size >= WARMUP_SAMPLES) {
             latestSmoothedAltitude - altitudeHistory.first().second
-        } else 0f
+        } else {
+            0f
+        }
 
         prefs.edit()
             .putFloat(AltitudeWidgetProvider.KEY_PREV_ALTITUDE, prevAltitude)
@@ -170,29 +169,17 @@ class AltitudeService : Service(), SensorEventListener {
             else             -> ALERT_NONE
         }
 
-        // 변화가 완화되면 알림 단계 초기화
         if (currentLevel == ALERT_NONE) {
             lastAlertLevel = ALERT_NONE
             return
         }
-
-        // 같은 단계 중복 알림 방지 (더 심해진 경우만 발송)
         if (currentLevel <= lastAlertLevel) return
         lastAlertLevel = currentLevel
 
         val (title, body) = when (currentLevel) {
-            ALERT_LEVEL_3 -> Pair(
-                "🚨 귀 먹먹함 심각",
-                "발살바법을 시도하세요 (코 막고 코 풀기)"
-            )
-            ALERT_LEVEL_2 -> Pair(
-                "⚠️ 귀 먹먹함 주의",
-                "하품하거나 침을 삼켜보세요"
-            )
-            else -> Pair(
-                "💧 귀 압력 변화 감지",
-                "물을 마시거나 하품해 보세요"
-            )
+            ALERT_LEVEL_3 -> Pair("🚨 귀 먹먹함 심각", "발살바법을 시도하세요 (코 막고 코 풀기)")
+            ALERT_LEVEL_2 -> Pair("⚠️ 귀 먹먹함 주의", "하품하거나 침을 삼켜보세요")
+            else           -> Pair("💧 귀 압력 변화 감지", "물을 마시거나 하품해 보세요")
         }
 
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -203,7 +190,6 @@ class AltitudeService : Service(), SensorEventListener {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
-
         nm.notify(ALERT_NOTIFICATION_ID, notification)
     }
 
@@ -211,25 +197,15 @@ class AltitudeService : Service(), SensorEventListener {
 
     private fun createNotificationChannels() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        // Foreground Service 채널 (상시)
         nm.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.channel_name),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
+            NotificationChannel(CHANNEL_ID, getString(R.string.channel_name),
+                NotificationManager.IMPORTANCE_LOW).apply {
                 description = getString(R.string.channel_description)
             }
         )
-
-        // 귀 압력 알림 채널 (이벤트성)
         nm.createNotificationChannel(
-            NotificationChannel(
-                ALERT_CHANNEL_ID,
-                "귀 압력 변화 알림",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
+            NotificationChannel(ALERT_CHANNEL_ID, "귀 압력 변화 알림",
+                NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "고도 변화에 따른 귀 먹먹함 예방 알림"
                 enableVibration(true)
             }
