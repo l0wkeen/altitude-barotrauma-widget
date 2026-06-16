@@ -19,11 +19,10 @@ import kotlin.math.abs
 /**
  * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service
  *
- * 변화량 실시간 반영 설계:
- * - accumulatedChange = (1분 윈도우 내 마지막 고도) - (첫 고도)
- * - 3초마다 유일하게 계산하여 저장 → 위젯 갱신
- * - immediateChange 제거: 3초치 데이터를 위젯에 보여주지 않음
- * - 워밍업(3개 샘플 미만) 동안 KEY_IS_WARMING_UP = true 포함
+ * 센서 초기화 시간 최소화 설계:
+ * - 첫 센서값 도착 즉시 saveAndUpdate() 호출 → 3초 대기 없이 바로 위젯 갱신
+ * - WARMUP_SAMPLES = 1 → 1개 샘플만 쌓이면 실시간 변화량 시작
+ * - 이후 3초 주기로 지속 갱신
  */
 class AltitudeService : Service(), SensorEventListener {
 
@@ -35,7 +34,9 @@ class AltitudeService : Service(), SensorEventListener {
         private const val UPDATE_INTERVAL_MS = 3_000L
         private const val WINDOW_DURATION_MS = 60_000L
         private const val MOVING_AVG_SIZE = 5
-        private const val WARMUP_SAMPLES = 3
+        // 첫 샘플 1개만 있어도 시작 가능
+        // (노이즈 제거는 이동평균 5개가 옥그라주지만, 변화량 시작은 즉시 가능)
+        private const val WARMUP_SAMPLES = 1
 
         private const val ALERT_NONE = 0
         private const val ALERT_LEVEL_1 = 1
@@ -51,6 +52,9 @@ class AltitudeService : Service(), SensorEventListener {
     private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
     private var lastAlertLevel = ALERT_NONE
+
+    // 첫 센서값이 도착했는지 추적 (즈시 saveAndUpdate 중복 호출 방지)
+    private var firstSensorValueReceived = false
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -74,7 +78,6 @@ class AltitudeService : Service(), SensorEventListener {
             return
         }
 
-        // 서비스 시작 시 누적 변화량 리셋 + 워밍업 플래그 설정
         getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
@@ -85,6 +88,8 @@ class AltitudeService : Service(), SensorEventListener {
         startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
         sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // 첫 센서값 도착 후 즉시 saveAndUpdate 호출하므로
+        // 여기서는 대기 없이 바로 주기 시작
         handler.post(updateRunnable)
     }
 
@@ -110,6 +115,13 @@ class AltitudeService : Service(), SensorEventListener {
         if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
         altitudeBuffer.addLast(rawAltitude)
         latestSmoothedAltitude = altitudeBuffer.average().toFloat()
+
+        // 첫 값이 도착하는 즉시 saveAndUpdate 호출
+        // → 3초를 기다리지 않고 위젯을 즉시 갱신
+        if (!firstSensorValueReceived) {
+            firstSensorValueReceived = true
+            handler.post { saveAndUpdate() }
+        }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -121,10 +133,8 @@ class AltitudeService : Service(), SensorEventListener {
 
         val now = System.currentTimeMillis()
 
-        // 1분 윈도우에 현재 고도 추가
         altitudeHistory.addLast(Pair(now, latestSmoothedAltitude))
 
-        // 1분 이전 데이터 제거
         while (altitudeHistory.isNotEmpty() &&
             now - altitudeHistory.first().first > WINDOW_DURATION_MS) {
             altitudeHistory.removeFirst()
@@ -132,7 +142,6 @@ class AltitudeService : Service(), SensorEventListener {
 
         val isWarmingUp = altitudeHistory.size < WARMUP_SAMPLES
 
-        // 워밍업 중에는 0f, 이후에는 1분 윈도우 첫값과의 리얼타임 차이
         val accumulatedChange = if (!isWarmingUp) {
             latestSmoothedAltitude - altitudeHistory.first().second
         } else {
