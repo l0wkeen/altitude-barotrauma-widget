@@ -8,8 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.RemoteViews
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import kotlin.math.abs
 
 class AltitudeWidgetProvider : AppWidgetProvider() {
@@ -19,7 +17,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         const val KEY_ALTITUDE = "current_altitude"
         const val KEY_ACCUMULATED_CHANGE = "accumulated_change"
         const val KEY_HAS_SENSOR = "has_sensor"
-        const val KEY_IS_WARMING_UP = "is_warming_up"  // 워밍업 상태 플래그
+        const val KEY_IS_WARMING_UP = "is_warming_up"
         const val INVALID_ALTITUDE = Float.MIN_VALUE
 
         fun updateWidgets(context: Context) {
@@ -70,7 +68,6 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
             val altitudeText = context.getString(R.string.altitude_format, currentAltitude)
 
-            // 누적 변화량만 사용 (워밍업 중에는 초기화 메시지 표시)
             val changeText = if (isWarmingUp) {
                 context.getString(R.string.action_initializing)
             } else {
@@ -95,7 +92,6 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         private fun getActionRecommendation(context: Context, change: Float): Pair<String, Int> {
             val absChange = abs(change)
             return when {
-                // absChange == 0f 일 때 정상 표시 (이전에는 초기화 중으로 잘못 표시됨)
                 absChange < 15f ->
                     Pair(context.getString(R.string.action_normal),
                         context.getColor(android.R.color.holo_green_light))
@@ -120,22 +116,17 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         for (widgetId in appWidgetIds) {
             updateWidget(context, appWidgetManager, widgetId)
         }
-        WorkManager.getInstance(context).enqueue(
-            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
-        )
-        AltitudeWorker.schedulePeriodicWork(context)
+        // onUpdate는 시스템 브로드캐스트 컨텍스트 → startForegroundService 직접 호출 가능
+        context.startForegroundService(Intent(context, AltitudeService::class.java))
     }
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        WorkManager.getInstance(context).enqueue(
-            OneTimeWorkRequestBuilder<AltitudeWorker>().build()
-        )
-        AltitudeWorker.schedulePeriodicWork(context)
+        context.startForegroundService(Intent(context, AltitudeService::class.java))
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        AltitudeWorker.cancelWork(context)
+        context.stopService(Intent(context, AltitudeService::class.java))
     }
 }
