@@ -62,6 +62,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.text_altitude, context.getString(R.string.altitude_measuring))
                 views.setTextViewText(R.id.text_altitude_change, context.getString(R.string.change_no_data))
                 views.setTextViewText(R.id.text_action, context.getString(R.string.action_initializing))
+                views.setTextColor(R.id.text_action, context.getColor(android.R.color.darker_gray))
                 manager.updateAppWidget(widgetId, views)
                 return
             }
@@ -76,7 +77,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
             val (actionMessage, actionColor) = if (isWarmingUp) {
                 Pair(context.getString(R.string.action_initializing),
-                    context.getColor(android.R.color.white))
+                    context.getColor(android.R.color.darker_gray))
             } else {
                 getActionRecommendation(context, accumulatedChange)
             }

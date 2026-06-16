@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-41:12
-INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-41:12
-INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-41:12
-INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-41:12
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-48:12
+INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-48:12
+INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-48:12
+INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:1:1-48:12
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] C:\Users\ps250\.gradle\caches\9.4.1\transforms\abd3532f073f9b56b6f78744f3917aef\transformed\jetified-appcompat-resources-1.7.0\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.appcompat:appcompat:1.7.0] C:\Users\ps250\.gradle\caches\9.4.1\transforms\e4be0ab9152fb6c5f6203dfa2887b9ec\transformed\appcompat-1.7.0\AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.fragment:fragment:1.5.4] C:\Users\ps250\.gradle\caches\9.4.1\transforms\984dc86e7059a2dcd94adc497b73ab6c\transformed\fragment-1.5.4\AndroidManifest.xml:17:1-24:12
@@ -59,9 +59,20 @@ uses-permission#android.permission.POST_NOTIFICATIONS
 ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:5:5-77
 	android:name
 		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:5:22-74
+uses-permission#android.permission.FOREGROUND_SERVICE
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:6:5-77
+MERGED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:26:5-77
+MERGED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:26:5-77
+	android:name
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:6:22-74
+uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:7:5-87
+	android:name
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:7:22-84
 application
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:7:5-40:19
-INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:7:5-40:19
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:9:5-47:19
+INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:9:5-47:19
+INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:9:5-47:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] C:\Users\ps250\.gradle\caches\9.4.1\transforms\a136167af2c081e04624093bf5c18395\transformed\jetified-emoji2-1.3.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.emoji2:emoji2:1.3.0] C:\Users\ps250\.gradle\caches\9.4.1\transforms\a136167af2c081e04624093bf5c18395\transformed\jetified-emoji2-1.3.0\AndroidManifest.xml:23:5-33:19
 MERGED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:28:5-143:19
@@ -83,55 +94,65 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] C:\Users\ps250\.gradle\cach
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.13.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\d27993e59f00df634fe342aa7d9ccbdb\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:10:9-35
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:12:9-35
 	android:label
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:9:9-41
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:11:9-41
+	android:testOnly
+		INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml
 	android:allowBackup
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:8:9-35
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:10:9-35
 	android:theme
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:11:9-52
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:13:9-52
 receiver#com.example.altitudewidget.AltitudeWidgetProvider
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:13:9-22:20
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:15:9-24:20
 	android:exported
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:15:13-36
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:17:13-36
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:14:13-51
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:16:13-51
 intent-filter#action:name:android.appwidget.action.APPWIDGET_UPDATE
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:16:13-18:29
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:18:13-20:29
 action#android.appwidget.action.APPWIDGET_UPDATE
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:17:17-84
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:19:17-84
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:17:25-81
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:19:25-81
 meta-data#android.appwidget.provider
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:19:13-21:64
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:21:13-23:64
 	android:resource
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:21:17-61
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:23:17-61
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:20:17-58
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:22:17-58
 receiver#com.example.altitudewidget.BootReceiver
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:24:9-30:20
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:26:9-32:20
 	android:exported
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:26:13-36
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:28:13-36
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:25:13-41
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:27:13-41
 intent-filter#action:name:android.intent.action.BOOT_COMPLETED
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:27:13-29:29
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:29:13-31:29
 action#android.intent.action.BOOT_COMPLETED
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:28:17-79
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:30:17-79
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:28:25-76
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:30:25-76
 receiver#com.example.altitudewidget.AltitudeMeasureReceiver
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:32:9-38:20
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:34:9-40:20
 	android:exported
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:34:13-37
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:36:13-37
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:33:13-52
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:35:13-52
 intent-filter#action:name:com.example.altitudewidget.ACTION_MEASURE
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:35:13-37:29
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:37:13-39:29
 action#com.example.altitudewidget.ACTION_MEASURE
-ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:36:17-84
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:38:17-84
 	android:name
-		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:36:25-81
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:38:25-81
+service#com.example.altitudewidget.AltitudeService
+ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:42:9-45:56
+	android:exported
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:44:13-37
+	android:foregroundServiceType
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:45:13-53
+	android:name
+		ADDED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml:43:13-44
 uses-sdk
 INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\ps250\StudioProjects\altitude-barotrauma-widget\app\src\main\AndroidManifest.xml
@@ -244,10 +265,6 @@ uses-permission#android.permission.ACCESS_NETWORK_STATE
 ADDED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:24:5-79
 	android:name
 		ADDED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:24:22-76
-uses-permission#android.permission.FOREGROUND_SERVICE
-ADDED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:26:5-77
-	android:name
-		ADDED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:26:22-74
 meta-data#androidx.work.WorkManagerInitializer
 ADDED from [androidx.work:work-runtime:2.9.1] C:\Users\ps250\.gradle\caches\9.4.1\transforms\2550369d7c36f1a5b3340bdfeb9971c0\transformed\work-runtime-2.9.1\AndroidManifest.xml:34:13-36:52
 	android:value
