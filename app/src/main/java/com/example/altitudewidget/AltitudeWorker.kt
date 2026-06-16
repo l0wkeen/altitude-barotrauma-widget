@@ -1,66 +1,41 @@
 package com.example.altitudewidget
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.work.*
-import java.util.concurrent.TimeUnit
 
+/**
+ * WorkManager Worker: AltitudeService를 시작하는 역할만 담당
+ *
+ * - 기존 AlarmManager 15분 반복 예약 제거
+ * - 모든 측정·갱신 주기는 AltitudeService 내부(3초)에서 관리
+ */
 class AltitudeWorker(private val context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        triggerMeasure(context)
+        startService(context)
         return Result.success()
     }
 
     companion object {
-        private const val WORK_TAG = "altitude_periodic_work"
-        private const val ALARM_REQUEST_CODE = 9001
+        private const val WORK_TAG = "altitude_service_starter"
 
-        fun triggerMeasure(context: Context) {
-            val intent = Intent(context, AltitudeMeasureReceiver::class.java).apply {
-                action = AltitudeMeasureReceiver.ACTION_MEASURE
-            }
-            val pi = PendingIntent.getBroadcast(
-                context, ALARM_REQUEST_CODE, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            pi.send()
+        fun startService(context: Context) {
+            val intent = Intent(context, AltitudeService::class.java)
+            context.startForegroundService(intent)
         }
 
         fun schedulePeriodicWork(context: Context) {
-            // 즉시 한 번 측정
-            triggerMeasure(context)
-
-            // AlarmManager로 15분마다 반복
-            val intent = Intent(context, AltitudeMeasureReceiver::class.java).apply {
-                action = AltitudeMeasureReceiver.ACTION_MEASURE
-            }
-            val pi = PendingIntent.getBroadcast(
-                context, ALARM_REQUEST_CODE, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            am.setInexactRepeating(
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + 15 * 60 * 1000L,
-                15 * 60 * 1000L,
-                pi
-            )
+            // AlarmManager 반복 제거: AltitudeService가 START_STICKY로 지속 실행됨
+            // 위젯 활성화 시 즉시 서비스 시작만 수행
+            startService(context)
         }
 
         fun cancelWork(context: Context) {
-            val intent = Intent(context, AltitudeMeasureReceiver::class.java).apply {
-                action = AltitudeMeasureReceiver.ACTION_MEASURE
-            }
-            val pi = PendingIntent.getBroadcast(
-                context, ALARM_REQUEST_CODE, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            am.cancel(pi)
+            // 위젯이 모두 제거되면 서비스 중지
+            val intent = Intent(context, AltitudeService::class.java)
+            context.stopService(intent)
         }
     }
 }
