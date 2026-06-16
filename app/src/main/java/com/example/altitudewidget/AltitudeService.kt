@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import kotlin.math.abs
 
 /**
  * 기압 센서로 고도를 측정하고 SharedPreferences에 저장하는 Foreground Service
@@ -23,15 +24,24 @@ import androidx.core.app.NotificationCompat
  * - 이동평균 5개 샘플로 노이즈 제거
  * - 3초 간격으로 위젯 갱신
  * - 1분 슬라이딩 윈도우로 누적 변화량 계산
+ * - 누적 변화량 기준 3단계 귀 압력 알림 (15m / 30m / 50m)
  */
 class AltitudeService : Service(), SensorEventListener {
 
     companion object {
         private const val CHANNEL_ID = "altitude_channel"
+        private const val ALERT_CHANNEL_ID = "altitude_alert"
         private const val NOTIFICATION_ID = 1
-        private const val UPDATE_INTERVAL_MS = 3_000L       // 3초 즈각 갱신
-        private const val WINDOW_DURATION_MS = 60_000L      // 1분 누적 윈도우
+        private const val ALERT_NOTIFICATION_ID = 1001
+        private const val UPDATE_INTERVAL_MS = 3_000L
+        private const val WINDOW_DURATION_MS = 60_000L
         private const val MOVING_AVG_SIZE = 5
+
+        // 알림 단계 (중복 방지용)
+        private const val ALERT_NONE = 0
+        private const val ALERT_LEVEL_1 = 1   // 15m 이상
+        private const val ALERT_LEVEL_2 = 2   // 30m 이상
+        private const val ALERT_LEVEL_3 = 3   // 50m 이상
     }
 
     private lateinit var sensorManager: SensorManager
@@ -45,6 +55,9 @@ class AltitudeService : Service(), SensorEventListener {
     private val altitudeHistory = ArrayDeque<Pair<Long, Float>>()
 
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
+
+    // 마지막으로 발송한 알림 단계 (같은 단계 중복 발송 방지)
+    private var lastAlertLevel = ALERT_NONE
 
     // 3초마다 위젯 갱신 Runnable
     private val updateRunnable = object : Runnable {
@@ -69,8 +82,8 @@ class AltitudeService : Service(), SensorEventListener {
             return
         }
 
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        createNotificationChannels()
+        startForeground(NOTIFICATION_ID, buildForegroundNotification())
 
         sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
         handler.post(updateRunnable)
@@ -97,7 +110,9 @@ class AltitudeService : Service(), SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
 
         val pressureHpa = event.values[0]
-        val rawAltitude = SensorManager.getAltitude(SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa)
+        val rawAltitude = SensorManager.getAltitude(
+            SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressureHpa
+        )
 
         // 이동평균 적용
         if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
@@ -113,7 +128,9 @@ class AltitudeService : Service(), SensorEventListener {
         if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
 
         val prefs = getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-        val prevAltitude = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE)
+        val prevAltitude = prefs.getFloat(
+            AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE
+        )
         val now = System.currentTimeMillis()
 
         // 1분 윈도우에 현재 고도 추가
@@ -138,25 +155,88 @@ class AltitudeService : Service(), SensorEventListener {
             .apply()
 
         AltitudeWidgetProvider.updateWidgets(this)
+        sendAlertIfNeeded(accumulatedChange)
     }
 
-    // ============ 알림 ============
+    // ============ 귀 압력 알림 ============
 
-    private fun createNotificationChannel() {
-        val channelName = getString(R.string.channel_name)
-        val channelDesc = getString(R.string.channel_description)
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            channelName,
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = channelDesc
+    private fun sendAlertIfNeeded(accumulatedChange: Float) {
+        val absChange = abs(accumulatedChange)
+
+        val currentLevel = when {
+            absChange >= 50f -> ALERT_LEVEL_3
+            absChange >= 30f -> ALERT_LEVEL_2
+            absChange >= 15f -> ALERT_LEVEL_1
+            else             -> ALERT_NONE
         }
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(channel)
+
+        // 변화가 완화되면 알림 단계 초기화
+        if (currentLevel == ALERT_NONE) {
+            lastAlertLevel = ALERT_NONE
+            return
+        }
+
+        // 같은 단계 중복 알림 방지 (더 심해진 경우만 발송)
+        if (currentLevel <= lastAlertLevel) return
+        lastAlertLevel = currentLevel
+
+        val (title, body) = when (currentLevel) {
+            ALERT_LEVEL_3 -> Pair(
+                "🚨 귀 먹먹함 심각",
+                "발살바법을 시도하세요 (코 막고 코 풀기)"
+            )
+            ALERT_LEVEL_2 -> Pair(
+                "⚠️ 귀 먹먹함 주의",
+                "하품하거나 침을 삼켜보세요"
+            )
+            else -> Pair(
+                "💧 귀 압력 변화 감지",
+                "물을 마시거나 하품해 보세요"
+            )
+        }
+
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        nm.notify(ALERT_NOTIFICATION_ID, notification)
     }
 
-    private fun buildNotification(): Notification {
+    // ============ 알림 채널 ============
+
+    private fun createNotificationChannels() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Foreground Service 채널 (상시)
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.channel_description)
+            }
+        )
+
+        // 귀 압력 알림 채널 (이벤트성)
+        nm.createNotificationChannel(
+            NotificationChannel(
+                ALERT_CHANNEL_ID,
+                "귀 압력 변화 알림",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "고도 변화에 따른 귀 먹먹함 예방 알림"
+                enableVibration(true)
+            }
+        )
+    }
+
+    private fun buildForegroundNotification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_text))
