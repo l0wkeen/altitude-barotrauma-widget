@@ -23,7 +23,6 @@ import kotlin.math.abs
 private data class AltitudePoint(val timeMs: Long, val altitudeM: Float)
 
 class AltitudeService : Service(), SensorEventListener {
-
     companion object {
         private const val TAG = "AltitudeService"
         private const val CHANNEL_ID = "altitude_channel"
@@ -33,11 +32,12 @@ class AltitudeService : Service(), SensorEventListener {
         private const val UPDATE_INTERVAL_MS = 3_000L
         private const val WINDOW_DURATION_MS = 60_000L
         private const val MOVING_AVG_SIZE = 5
-
         private const val ALERT_NONE = 0
         private const val ALERT_LEVEL_1 = 1
         private const val ALERT_LEVEL_2 = 2
         private const val ALERT_LEVEL_3 = 3
+        // 로그 저장 주기: 매 N번째 업데이트마다 1회 저장 (3초 * 10 = 30초마다)
+        private const val LOG_SAVE_INTERVAL = 10
     }
 
     private lateinit var sensorManager: SensorManager
@@ -50,6 +50,12 @@ class AltitudeService : Service(), SensorEventListener {
     private var latestSmoothedAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
     private var lastAlertLevel = ALERT_NONE
     private var firstSensorValueReceived = false
+
+    // 직전 고도값 추적 (immediateChange 계산용)
+    private var previousAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
+
+    // 로그 저장 카운터
+    private var updateCount = 0
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -93,10 +99,10 @@ class AltitudeService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, buildForegroundNotification())
         }
 
-        // SENSOR_DELAY_NORMAL (~200ms): 위젯은 3초 주기 갱신이라 SENSOR_DELAY_UI 불필요, 배터리 최적화
+        // SENSOR_DELAY_NORMAL (~200ms): 위젯은 3초 주기 갱신이라 배터리 최적화
         val registered = sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
         Log.d(TAG, "Sensor registration status: $registered")
-        
+
         handler.post(updateRunnable)
         Log.d(TAG, "Service Created and updateRunnable started")
     }
@@ -108,28 +114,25 @@ class AltitudeService : Service(), SensorEventListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     // ============ 센서 콜백 ============
-
     override fun onSensorChanged(event: SensorEvent?) {
         event ?: return
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
-
         val pressure = event.values[0]
         val rawAltitude = SensorManager.getAltitude(
             SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure
         )
-        
-        Log.d(TAG, "Sensor raw value: $pressure, Altitude: $rawAltitude")
 
+        Log.d(TAG, "Sensor raw value: $pressure, Altitude: $rawAltitude")
         if (altitudeBuffer.size >= MOVING_AVG_SIZE) altitudeBuffer.removeFirst()
         altitudeBuffer.addLast(rawAltitude)
         latestSmoothedAltitude = altitudeBuffer.average().toFloat()
 
         if (!firstSensorValueReceived) {
             firstSensorValueReceived = true
+            previousAltitude = latestSmoothedAltitude
             getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, false)
@@ -141,7 +144,6 @@ class AltitudeService : Service(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     // ============ 데이터 저장 & 위젯 갱신 ============
-
     private fun saveAndUpdate() {
         if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
 
@@ -161,6 +163,13 @@ class AltitudeService : Service(), SensorEventListener {
             0f
         }
 
+        // 직전 업데이트 대비 즉각 변화량 계산
+        val immediateChange = if (previousAltitude != AltitudeWidgetProvider.INVALID_ALTITUDE) {
+            latestSmoothedAltitude - previousAltitude
+        } else {
+            0f
+        }
+
         getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, latestSmoothedAltitude)
@@ -170,30 +179,57 @@ class AltitudeService : Service(), SensorEventListener {
             .apply()
 
         AltitudeWidgetProvider.updateWidgets(this)
-        if (!isWarmingUp) sendAlertIfNeeded(accumulatedChange)
+
+        if (!isWarmingUp) {
+            val alertFired = sendAlertIfNeeded(accumulatedChange)
+
+            // 30초(=LOG_SAVE_INTERVAL번)마다 주기적 로그 저장
+            // 알림이 발생한 경우에도 즉시 저장 (triggeredByAlert=true)
+            updateCount++
+            if (alertFired || updateCount >= LOG_SAVE_INTERVAL) {
+                val symptomLevel = when {
+                    abs(accumulatedChange) >= 50f -> 2
+                    abs(accumulatedChange) >= 30f -> 1
+                    abs(accumulatedChange) >= 15f -> 1
+                    else -> 0
+                }
+                EarLogRepository.save(
+                    this,
+                    EarLogData(
+                        timestamp = now,
+                        altitude = latestSmoothedAltitude,
+                        accumulatedChange = accumulatedChange,
+                        immediateChange = immediateChange,
+                        symptomLevel = symptomLevel,
+                        triggeredByAlert = alertFired
+                    )
+                )
+                if (updateCount >= LOG_SAVE_INTERVAL) updateCount = 0
+                Log.d(TAG, "EarLog saved: alt=${latestSmoothedAltitude}m, change=${accumulatedChange}m, alert=$alertFired")
+            }
+        }
+
+        previousAltitude = latestSmoothedAltitude
     }
 
-    // ============ 귀 압력 알림 ============
-
-    private fun sendAlertIfNeeded(accumulatedChange: Float) {
+    // ============ 귀 압력 알림 (반환값: 알림이 실제로 발생했는지) ============
+    private fun sendAlertIfNeeded(accumulatedChange: Float): Boolean {
         val absChange = abs(accumulatedChange)
         val currentLevel = when {
             absChange >= 50f -> ALERT_LEVEL_3
             absChange >= 30f -> ALERT_LEVEL_2
             absChange >= 15f -> ALERT_LEVEL_1
-            else             -> ALERT_NONE
+            else -> ALERT_NONE
         }
-
-        if (currentLevel == ALERT_NONE) { lastAlertLevel = ALERT_NONE; return }
-        if (currentLevel <= lastAlertLevel) return
+        if (currentLevel == ALERT_NONE) { lastAlertLevel = ALERT_NONE; return false }
+        if (currentLevel <= lastAlertLevel) return false
         lastAlertLevel = currentLevel
 
         val (title, body) = when (currentLevel) {
             ALERT_LEVEL_3 -> Pair("🚨 귀 먹먹함 심각", "발살바법을 시도하세요 (코 막고 코 풀기)")
             ALERT_LEVEL_2 -> Pair("⚠️ 귀 먹먹함 주의", "하품하거나 침을 삼켜보세요")
-            else           -> Pair("💧 귀 압력 변화 감지", "물을 마시거나 하품해 보세요")
+            else -> Pair("💧 귀 압력 변화 감지", "물을 마시거나 하품해 보세요")
         }
-
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(ALERT_NOTIFICATION_ID,
             NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
@@ -204,10 +240,10 @@ class AltitudeService : Service(), SensorEventListener {
                 .setAutoCancel(true)
                 .build()
         )
+        return true
     }
 
     // ============ 알림 채널 ============
-
     private fun createNotificationChannels() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
