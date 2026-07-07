@@ -93,8 +93,8 @@ class AltitudeService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, buildForegroundNotification())
         }
 
-        // SENSOR_DELAY_UI (~60ms) 로 변경하여 첫 응답 속도 최적화
-        val registered = sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_UI)
+        // SENSOR_DELAY_NORMAL (~200ms): 위젯은 3초 주기 갱신이라 SENSOR_DELAY_UI 불필요, 배터리 최적화
+        val registered = sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
         Log.d(TAG, "Sensor registration status: $registered")
         
         handler.post(updateRunnable)
