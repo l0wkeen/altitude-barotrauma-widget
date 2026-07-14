@@ -185,6 +185,7 @@ class AltitudeService : Service(), SensorEventListener {
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, latestSmoothedAltitude)
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulatedChange)
+            .putFloat(AltitudeWidgetProvider.KEY_IMMEDIATE_CHANGE, immediateChange)
             .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
             .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, isWarmingUp)
             .apply()
@@ -198,17 +199,15 @@ class AltitudeService : Service(), SensorEventListener {
             // 알림이 발생한 경우에도 즉시 저장 (triggeredByAlert=true)
             updateCount++
             if (alertFired || updateCount >= LOG_SAVE_INTERVAL) {
-                val symptomLevel = when {
-                    abs(accumulatedChange) >= 50f -> EarLogData.SYMPTOM_SEVERE
-                    abs(accumulatedChange) >= personalLevel1Threshold -> EarLogData.SYMPTOM_MILD
-                    else -> EarLogData.SYMPTOM_NONE
-                }
+                // symptomLevel은 여기서 추정하지 않는다 — 실제 증상 여부는 사용자가
+                // MainActivity에서 직접 보고한 기록만을 근거로 삼아야 개인화 임계값이
+                // 순환 논리(변화량 → 추정 증상 → 다시 변화량 기준 임계값) 없이 계산된다.
                 val logEntry = EarLogData(
                     timestamp = now,
                     altitude = latestSmoothedAltitude,
                     accumulatedChange = accumulatedChange,
                     immediateChange = immediateChange,
-                    symptomLevel = symptomLevel,
+                    symptomLevel = EarLogData.SYMPTOM_NONE,
                     triggeredByAlert = alertFired
                 )
                 val appContext = applicationContext

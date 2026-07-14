@@ -16,6 +16,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         const val PREFS_NAME = "AltitudePrefs"
         const val KEY_ALTITUDE = "current_altitude"
         const val KEY_ACCUMULATED_CHANGE = "accumulated_change"
+        const val KEY_IMMEDIATE_CHANGE = "immediate_change"
         const val KEY_HAS_SENSOR = "has_sensor"
         const val KEY_IS_WARMING_UP = "is_warming_up"
         const val INVALID_ALTITUDE = Float.MIN_VALUE
