@@ -29,6 +29,18 @@
     <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
     <string name="notification_title">고도 모니터링 중</string>
     <string name="notification_text">기압 센서로 고도 변화를 추적합니다</string>
+    <string name="alert_channel_name">귀 압력 변화 알림</string>
+    <string name="alert_channel_description">고도 변화에 따른 귀 먹먹함 예방 알림</string>
+
+    <!-- 귀 압력 경고 알림 (1~3단계) -->
+    <string name="alert_title_level1">💧 귀 압력 변화 감지</string>
+    <string name="alert_body_level1">물을 마시거나 하품해 보세요</string>
+    <string name="alert_title_level2">⚠️ 귀 먹먹함 주의</string>
+    <string name="alert_body_level2">하품하거나 침을 삼켜보세요</string>
+    <string name="alert_title_level3">🚨 귀 먹먹함 심각</string>
+    <string name="alert_body_level3">발살바법을 시도하세요 (코 막고 코 풀기)</string>
+    <string name="alert_action_mild">약간 먹먹해요</string>
+    <string name="alert_action_severe">심하게 먹먹해요</string>
 
     <!-- MainActivity: 알림 권한 요청 화면 -->
     <string name="permission_granted">✅ 알림 권한이 허용되었습니다</string>
@@ -44,4 +56,19 @@
     <string name="symptom_mild_button">약간 먹먹해요</string>
     <string name="symptom_severe_button">심하게 먹먹해요</string>
     <string name="symptom_saved_toast">기록되었습니다. 감사합니다!</string>
+
+    <!-- MainActivity: 최근 기록 -->
+    <string name="history_section_title">최근 기록</string>
+    <string name="history_empty">아직 기록이 없습니다.</string>
+    <string name="history_entry_format">%1$s · 고도 %2$,.0f m · 변화 %3$+.1f m%4$s</string>
+    <string name="history_symptom_mild"> · 약간 먹먹함</string>
+    <string name="history_symptom_severe"> · 심하게 먹먹함</string>
+
+    <!-- MainActivity: 기록 초기화 -->
+    <string name="clear_logs_button">기록 초기화</string>
+    <string name="clear_logs_confirm_title">기록을 모두 삭제할까요?</string>
+    <string name="clear_logs_confirm_message">저장된 모든 고도 변화 기록과 증상 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</string>
+    <string name="clear_logs_confirm_ok">삭제</string>
+    <string name="clear_logs_confirm_cancel">취소</string>
+    <string name="clear_logs_done_toast">모든 기록이 삭제되었습니다.</string>
 </resources>

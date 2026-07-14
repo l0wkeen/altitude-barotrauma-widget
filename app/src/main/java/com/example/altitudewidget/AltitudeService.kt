@@ -3,6 +3,7 @@ package com.example.altitudewidget
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -193,7 +194,7 @@ class AltitudeService : Service(), SensorEventListener {
         AltitudeWidgetProvider.updateWidgets(this)
 
         if (!isWarmingUp) {
-            val alertFired = sendAlertIfNeeded(accumulatedChange)
+            val alertFired = sendAlertIfNeeded(accumulatedChange, immediateChange)
 
             // 30초(=LOG_SAVE_INTERVAL번)마다 주기적 로그 저장
             // 알림이 발생한 경우에도 즉시 저장 (triggeredByAlert=true)
@@ -224,7 +225,7 @@ class AltitudeService : Service(), SensorEventListener {
     }
 
     // ============ 귀 압력 알림 (반환값: 알림이 실제로 발생했는지) ============
-    private fun sendAlertIfNeeded(accumulatedChange: Float): Boolean {
+    private fun sendAlertIfNeeded(accumulatedChange: Float, immediateChange: Float): Boolean {
         val absChange = abs(accumulatedChange)
         val currentLevel = when {
             absChange >= 50f -> ALERT_LEVEL_3
@@ -237,9 +238,9 @@ class AltitudeService : Service(), SensorEventListener {
         lastAlertLevel = currentLevel
 
         val (title, body) = when (currentLevel) {
-            ALERT_LEVEL_3 -> Pair("🚨 귀 먹먹함 심각", "발살바법을 시도하세요 (코 막고 코 풀기)")
-            ALERT_LEVEL_2 -> Pair("⚠️ 귀 먹먹함 주의", "하품하거나 침을 삼켜보세요")
-            else -> Pair("💧 귀 압력 변화 감지", "물을 마시거나 하품해 보세요")
+            ALERT_LEVEL_3 -> getString(R.string.alert_title_level3) to getString(R.string.alert_body_level3)
+            ALERT_LEVEL_2 -> getString(R.string.alert_title_level2) to getString(R.string.alert_body_level2)
+            else -> getString(R.string.alert_title_level1) to getString(R.string.alert_body_level1)
         }
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(ALERT_NOTIFICATION_ID,
@@ -249,9 +250,45 @@ class AltitudeService : Service(), SensorEventListener {
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
+                .setContentIntent(openAppPendingIntent())
+                .addAction(
+                    android.R.drawable.ic_menu_add,
+                    getString(R.string.alert_action_mild),
+                    symptomActionPendingIntent(EarLogData.SYMPTOM_MILD, accumulatedChange, immediateChange, requestCode = 101)
+                )
+                .addAction(
+                    android.R.drawable.ic_menu_add,
+                    getString(R.string.alert_action_severe),
+                    symptomActionPendingIntent(EarLogData.SYMPTOM_SEVERE, accumulatedChange, immediateChange, requestCode = 102)
+                )
                 .build()
         )
         return true
+    }
+
+    private fun openAppPendingIntent(): PendingIntent = PendingIntent.getActivity(
+        this, 0, Intent(this, MainActivity::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    private fun symptomActionPendingIntent(
+        symptomLevel: Int,
+        accumulatedChange: Float,
+        immediateChange: Float,
+        requestCode: Int
+    ): PendingIntent {
+        val intent = Intent(this, SymptomLogReceiver::class.java).apply {
+            action = SymptomLogReceiver.ACTION_LOG_SYMPTOM
+            putExtra(SymptomLogReceiver.EXTRA_SYMPTOM_LEVEL, symptomLevel)
+            putExtra(SymptomLogReceiver.EXTRA_ALTITUDE, latestSmoothedAltitude)
+            putExtra(SymptomLogReceiver.EXTRA_ACCUMULATED_CHANGE, accumulatedChange)
+            putExtra(SymptomLogReceiver.EXTRA_IMMEDIATE_CHANGE, immediateChange)
+            putExtra(SymptomLogReceiver.EXTRA_NOTIFICATION_ID, ALERT_NOTIFICATION_ID)
+        }
+        return PendingIntent.getBroadcast(
+            this, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     // ============ 알림 채널 ============
@@ -264,9 +301,9 @@ class AltitudeService : Service(), SensorEventListener {
             }
         )
         nm.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL_ID, "귀 압력 변화 알림",
+            NotificationChannel(ALERT_CHANNEL_ID, getString(R.string.alert_channel_name),
                 NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "고도 변화에 따른 귀 먹먹함 예방 알림"
+                description = getString(R.string.alert_channel_description)
                 enableVibration(true)
             }
         )

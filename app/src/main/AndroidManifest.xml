@@ -41,6 +41,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".SymptomLogReceiver"
+            android:exported="false" />
+
         <service
             android:name=".AltitudeService"
             android:exported="false"

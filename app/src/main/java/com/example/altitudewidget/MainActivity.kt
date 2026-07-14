@@ -1,6 +1,7 @@
 package com.example.altitudewidget
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,6 +12,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -25,7 +29,12 @@ import java.util.concurrent.Executors
  */
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        private const val HISTORY_SIZE = 8
+    }
+
     private val logExecutor = Executors.newSingleThreadExecutor()
+    private val timeFormatter = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -43,13 +52,16 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_symptom_severe).setOnClickListener {
             logSymptom(EarLogData.SYMPTOM_SEVERE)
         }
+        findViewById<Button>(R.id.btn_clear_logs).setOnClickListener {
+            confirmClearLogs()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updatePermissionStatusText(hasNotificationPermission())
         updateCurrentStatusText()
-        loadLogStats()
+        loadLogs()
     }
 
     override fun onDestroy() {
@@ -112,23 +124,72 @@ class MainActivity : ComponentActivity() {
             EarLogRepository.save(appContext, logEntry)
             runOnUiThread {
                 Toast.makeText(this, R.string.symptom_saved_toast, Toast.LENGTH_SHORT).show()
-                loadLogStats()
+                loadLogs()
             }
         }
     }
 
-    private fun loadLogStats() {
+    // ============ 기록 통계 & 최근 기록 ============
+    private fun loadLogs() {
         val appContext = applicationContext
         logExecutor.execute {
-            val count = EarLogRepository.getCount(appContext)
+            val logs = EarLogRepository.loadAll(appContext)
             val threshold = EarLogRepository.getPersonalThreshold(appContext)
+            val recent = logs.takeLast(HISTORY_SIZE).reversed()
             runOnUiThread {
-                val statsView = findViewById<TextView>(R.id.text_log_stats)
-                statsView.text = if (count == 0) {
-                    getString(R.string.log_stats_none)
-                } else {
-                    getString(R.string.log_stats_format, count, threshold)
-                }
+                updateLogStatsText(logs.size, threshold)
+                updateHistoryText(recent)
+            }
+        }
+    }
+
+    private fun updateLogStatsText(count: Int, threshold: Float) {
+        findViewById<TextView>(R.id.text_log_stats).text = if (count == 0) {
+            getString(R.string.log_stats_none)
+        } else {
+            getString(R.string.log_stats_format, count, threshold)
+        }
+    }
+
+    private fun updateHistoryText(recent: List<EarLogData>) {
+        val historyView = findViewById<TextView>(R.id.text_history)
+        if (recent.isEmpty()) {
+            historyView.text = getString(R.string.history_empty)
+            return
+        }
+        historyView.text = recent.joinToString("\n") { log ->
+            val symptomSuffix = when (log.symptomLevel) {
+                EarLogData.SYMPTOM_MILD -> getString(R.string.history_symptom_mild)
+                EarLogData.SYMPTOM_SEVERE -> getString(R.string.history_symptom_severe)
+                else -> ""
+            }
+            getString(
+                R.string.history_entry_format,
+                timeFormatter.format(Date(log.timestamp)),
+                log.altitude,
+                log.accumulatedChange,
+                symptomSuffix
+            )
+        }
+    }
+
+    // ============ 기록 초기화 ============
+    private fun confirmClearLogs() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.clear_logs_confirm_title)
+            .setMessage(R.string.clear_logs_confirm_message)
+            .setPositiveButton(R.string.clear_logs_confirm_ok) { _, _ -> clearLogs() }
+            .setNegativeButton(R.string.clear_logs_confirm_cancel, null)
+            .show()
+    }
+
+    private fun clearLogs() {
+        val appContext = applicationContext
+        logExecutor.execute {
+            EarLogRepository.clearAll(appContext)
+            runOnUiThread {
+                Toast.makeText(this, R.string.clear_logs_done_toast, Toast.LENGTH_SHORT).show()
+                loadLogs()
             }
         }
     }

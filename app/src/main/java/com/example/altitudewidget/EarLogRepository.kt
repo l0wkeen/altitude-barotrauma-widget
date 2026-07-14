@@ -11,6 +11,7 @@ import kotlin.math.abs
  *
  * - 저장 위치: /data/data/패키지/files/ear_logs.jsonl
  * - save() 최적화: 전체 재작성 대신 파일 끝에 한 줄 append (O(1))
+ * - 파일이 MAX_FILE_BYTES를 넘으면 오래된 기록을 정리해 무한정 커지지 않게 한다
  * - getPersonalThreshold(): 누적 데이터로 개인 맞춤 임계값 계산
  */
 object EarLogRepository {
@@ -20,8 +21,25 @@ object EarLogRepository {
     // ============ 저장 (append) ============
 
     fun save(context: Context, log: EarLogData) {
+        val file = File(context.filesDir, FILE_NAME)
         val line = logToJson(log).toString()
-        File(context.filesDir, FILE_NAME).appendText(line + "\n")
+        file.appendText(line + "\n")
+
+        // 파일이 일정 크기를 넘으면 오래된 기록을 정리한다.
+        // 평소에는 length() 확인만 하므로 append의 O(1) 특성을 해치지 않는다.
+        if (file.length() > MAX_FILE_BYTES) {
+            trimOldEntries(file)
+        }
+    }
+
+    private fun trimOldEntries(file: File) {
+        try {
+            val lines = file.readLines().filter { it.isNotBlank() }
+            if (lines.size <= TRIM_KEEP_LINES) return
+            file.writeText(lines.takeLast(TRIM_KEEP_LINES).joinToString("\n") + "\n")
+        } catch (_: Exception) {
+            // 정리에 실패해도 다음 save() 호출에서 다시 시도된다.
+        }
     }
 
     // ============ 읽기 ============
@@ -150,4 +168,6 @@ object EarLogRepository {
     private const val MIN_LOGS_FOR_PERSONAL = 5   // 개인화 최소 샘플 수
     const val DEFAULT_THRESHOLD_LEVEL1 = 15f       // 기본 1단계 임계값 (m)
     private const val MIN_THRESHOLD = 5f              // 최소 허용 임계값 (m)
+    private const val MAX_FILE_BYTES = 1_000_000L  // 이 크기를 넘으면 오래된 기록 정리 (약 1MB)
+    private const val TRIM_KEEP_LINES = 3000       // 정리 후 남길 최신 기록 수
 }
