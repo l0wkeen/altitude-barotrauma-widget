@@ -17,6 +17,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 /** 고도 히스토리 포인트 — Pair<Long,Float> 오토박싱 제거 */
@@ -56,6 +57,12 @@ class AltitudeService : Service(), SensorEventListener {
 
     // 로그 저장 카운터
     private var updateCount = 0
+
+    // 로그 파일 I/O(디스크 접근)를 메인 스레드에서 분리하기 위한 전용 스레드
+    private val logExecutor = Executors.newSingleThreadExecutor()
+
+    // 개인 맞춤 1단계 임계값 — 백그라운드에서 갱신되므로 volatile
+    @Volatile private var personalLevel1Threshold = EarLogRepository.DEFAULT_THRESHOLD_LEVEL1
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -104,6 +111,9 @@ class AltitudeService : Service(), SensorEventListener {
         Log.d(TAG, "Sensor registration status: $registered")
 
         handler.post(updateRunnable)
+        logExecutor.execute {
+            personalLevel1Threshold = EarLogRepository.getPersonalThreshold(applicationContext)
+        }
         Log.d(TAG, "Service Created and updateRunnable started")
     }
 
@@ -111,6 +121,7 @@ class AltitudeService : Service(), SensorEventListener {
         super.onDestroy()
         handler.removeCallbacks(updateRunnable)
         if (pressureSensor != null) sensorManager.unregisterListener(this)
+        logExecutor.shutdown()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -188,22 +199,23 @@ class AltitudeService : Service(), SensorEventListener {
             updateCount++
             if (alertFired || updateCount >= LOG_SAVE_INTERVAL) {
                 val symptomLevel = when {
-                    abs(accumulatedChange) >= 50f -> 2
-                    abs(accumulatedChange) >= 30f -> 1
-                    abs(accumulatedChange) >= 15f -> 1
-                    else -> 0
+                    abs(accumulatedChange) >= 50f -> EarLogData.SYMPTOM_SEVERE
+                    abs(accumulatedChange) >= personalLevel1Threshold -> EarLogData.SYMPTOM_MILD
+                    else -> EarLogData.SYMPTOM_NONE
                 }
-                EarLogRepository.save(
-                    this,
-                    EarLogData(
-                        timestamp = now,
-                        altitude = latestSmoothedAltitude,
-                        accumulatedChange = accumulatedChange,
-                        immediateChange = immediateChange,
-                        symptomLevel = symptomLevel,
-                        triggeredByAlert = alertFired
-                    )
+                val logEntry = EarLogData(
+                    timestamp = now,
+                    altitude = latestSmoothedAltitude,
+                    accumulatedChange = accumulatedChange,
+                    immediateChange = immediateChange,
+                    symptomLevel = symptomLevel,
+                    triggeredByAlert = alertFired
                 )
+                val appContext = applicationContext
+                logExecutor.execute {
+                    EarLogRepository.save(appContext, logEntry)
+                    personalLevel1Threshold = EarLogRepository.getPersonalThreshold(appContext)
+                }
                 if (updateCount >= LOG_SAVE_INTERVAL) updateCount = 0
                 Log.d(TAG, "EarLog saved: alt=${latestSmoothedAltitude}m, change=${accumulatedChange}m, alert=$alertFired")
             }
@@ -218,7 +230,7 @@ class AltitudeService : Service(), SensorEventListener {
         val currentLevel = when {
             absChange >= 50f -> ALERT_LEVEL_3
             absChange >= 30f -> ALERT_LEVEL_2
-            absChange >= 15f -> ALERT_LEVEL_1
+            absChange >= personalLevel1Threshold -> ALERT_LEVEL_1
             else -> ALERT_NONE
         }
         if (currentLevel == ALERT_NONE) { lastAlertLevel = ALERT_NONE; return false }
