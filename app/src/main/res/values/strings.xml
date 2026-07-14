@@ -15,7 +15,7 @@
     <string name="change_no_data">변화량: 측정 중…</string>
 
     <!-- 행동 추천 -->
-    <string name="action_valsalva">⚠️ 의사: 발살바 방법 시도</string>
+    <string name="action_valsalva">⚠️ 발살바 방법 시도 권장</string>
     <string name="action_yawn">하품 또는 침 삼키기</string>
     <string name="action_drink">물을 조금 마세요</string>
     <string name="action_normal">✅ 고도 변화 정상</string>
@@ -34,13 +34,15 @@
     <string name="alert_channel_name">귀 압력 변화 알림</string>
     <string name="alert_channel_description">고도 변화에 따른 귀 먹먹함 예방 알림</string>
 
-    <!-- 귀 압력 경고 알림 (1~3단계) -->
+    <!-- 귀 압력 경고 알림 (1~3단계)
+         "증상이 있다"는 진단이 아니라 "증상이 생길 수 있으니 미리 대응하라"는
+         예방 취지의 안내 문구로 통일한다. -->
     <string name="alert_title_level1">💧 귀 압력 변화 감지</string>
     <string name="alert_body_level1">물을 마시거나 하품해 보세요</string>
-    <string name="alert_title_level2">⚠️ 귀 먹먹함 주의</string>
+    <string name="alert_title_level2">⚠️ 귀 먹먹함 위험 신호</string>
     <string name="alert_body_level2">하품하거나 침을 삼켜보세요</string>
-    <string name="alert_title_level3">🚨 귀 먹먹함 심각</string>
-    <string name="alert_body_level3">발살바법을 시도하세요 (코 막고 코 풀기)</string>
+    <string name="alert_title_level3">🚨 귀 먹먹함 위험 감지</string>
+    <string name="alert_body_level3">발살바법을 시도해 보세요 (코 막고 코 풀기)</string>
     <string name="alert_action_mild">약간 먹먹해요</string>
     <string name="alert_action_severe">심하게 먹먹해요</string>
 
@@ -59,7 +61,6 @@
     <string name="current_status_stalled">⚠️ 센서 응답이 없습니다. 배터리 최적화 설정을 확인해 주세요.</string>
     <string name="current_status_format">현재 고도 %,.0f m · 1분 누적 %+.1f m</string>
     <string name="log_stats_format">기록 %1$d개 · 개인 맞춤 임계값 %2$.1f m</string>
-    <string name="log_stats_none">아직 기록이 없습니다. 임계값은 기본값(15m)을 사용합니다.</string>
     <string name="symptom_section_title">지금 귀가 먹먹한가요?</string>
     <string name="symptom_mild_button">약간 먹먹해요</string>
     <string name="symptom_severe_button">심하게 먹먹해요</string>

@@ -20,6 +20,7 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         const val KEY_HAS_SENSOR = "has_sensor"
         const val KEY_IS_WARMING_UP = "is_warming_up"
         const val KEY_SENSOR_STALLED = "sensor_stalled"
+        const val KEY_PERSONAL_THRESHOLD = "personal_threshold"
         const val INVALID_ALTITUDE = Float.MIN_VALUE
 
         fun updateWidgets(context: Context) {
@@ -90,7 +91,8 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
                 Pair(context.getString(R.string.action_initializing),
                     context.getColor(android.R.color.darker_gray))
             } else {
-                getActionRecommendation(context, accumulatedChange)
+                val personalThreshold = prefs.getFloat(KEY_PERSONAL_THRESHOLD, AlertThresholds.LEVEL1_DEFAULT_MPM)
+                getActionRecommendation(context, accumulatedChange, personalThreshold)
             }
 
             views.setTextViewText(R.id.text_altitude, altitudeText)
@@ -101,16 +103,20 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
             manager.updateAppWidget(widgetId, views)
         }
 
-        private fun getActionRecommendation(context: Context, change: Float): Pair<String, Int> {
+        private fun getActionRecommendation(
+            context: Context,
+            change: Float,
+            personalThreshold: Float
+        ): Pair<String, Int> {
             val absChange = abs(change)
             return when {
-                absChange < 15f ->
+                absChange < personalThreshold ->
                     Pair(context.getString(R.string.action_normal),
                         context.getColor(android.R.color.holo_green_light))
-                absChange >= 50f ->
+                absChange >= AlertThresholds.LEVEL3_MPM ->
                     Pair(context.getString(R.string.action_valsalva),
                         context.getColor(android.R.color.holo_red_light))
-                absChange >= 30f ->
+                absChange >= AlertThresholds.LEVEL2_MPM ->
                     Pair(context.getString(R.string.action_yawn),
                         context.getColor(android.R.color.holo_orange_light))
                 else ->

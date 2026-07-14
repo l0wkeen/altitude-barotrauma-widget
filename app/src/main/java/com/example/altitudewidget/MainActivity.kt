@@ -182,11 +182,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateLogStatsText(count: Int, threshold: Float) {
-        findViewById<TextView>(R.id.text_log_stats).text = if (count == 0) {
-            getString(R.string.log_stats_none)
-        } else {
+        // count == 0일 때도 getPersonalThreshold()는 기본값(AlertThresholds.LEVEL1_DEFAULT_MPM)을
+        // 반환하므로 별도 분기 없이 그대로 표시해도 문구가 어색하지 않다.
+        findViewById<TextView>(R.id.text_log_stats).text =
             getString(R.string.log_stats_format, count, threshold)
-        }
     }
 
     private fun updateHistoryText(recent: List<EarLogData>) {

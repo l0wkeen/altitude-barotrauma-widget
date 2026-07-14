@@ -90,8 +90,8 @@ object EarLogRepository {
             .toFloat()
 
         // 평균의 80%를 임계값으로 설정
-        // (예: 평균 25m에서 증상 발생 시 임계값 = 20m)
-        // 최소 5m, 최대 기본값 15m 범위 내로 제한
+        // (예: 평균 80m에서 증상 발생 시 임계값 = 64m)
+        // 최소 30m, 최대 기본값 90m 범위 내로 제한
         val personal = (avgChange * 0.8f)
             .coerceAtLeast(MIN_THRESHOLD)
             .coerceAtMost(DEFAULT_THRESHOLD_LEVEL1)
@@ -107,9 +107,15 @@ object EarLogRepository {
      */
     fun getAlertStats(context: Context): Triple<Int, Int, Int> {
         val logs = loadAll(context)
-        val severe = logs.count { abs(it.accumulatedChange) >= 50f && it.triggeredByAlert }
-        val moderate = logs.count { abs(it.accumulatedChange) in 30f..49.9f && it.triggeredByAlert }
-        val mild = logs.count { abs(it.accumulatedChange) in 15f..29.9f && it.triggeredByAlert }
+        val severe = logs.count { abs(it.accumulatedChange) >= AlertThresholds.LEVEL3_MPM && it.triggeredByAlert }
+        val moderate = logs.count {
+            val change = abs(it.accumulatedChange)
+            change >= AlertThresholds.LEVEL2_MPM && change < AlertThresholds.LEVEL3_MPM && it.triggeredByAlert
+        }
+        val mild = logs.count {
+            val change = abs(it.accumulatedChange)
+            change >= AlertThresholds.LEVEL1_DEFAULT_MPM && change < AlertThresholds.LEVEL2_MPM && it.triggeredByAlert
+        }
         return Triple(severe, moderate, mild)
     }
 
@@ -166,8 +172,8 @@ object EarLogRepository {
 
     // ============ 상수 ============
     private const val MIN_LOGS_FOR_PERSONAL = 5   // 개인화 최소 샘플 수
-    const val DEFAULT_THRESHOLD_LEVEL1 = 15f       // 기본 1단계 임계값 (m)
-    private const val MIN_THRESHOLD = 5f              // 최소 허용 임계값 (m)
+    const val DEFAULT_THRESHOLD_LEVEL1 = AlertThresholds.LEVEL1_DEFAULT_MPM  // 기본 1단계 임계값 (m)
+    private const val MIN_THRESHOLD = 30f             // 최소 허용 임계값 (m) — 기본값의 1/3
     private const val MAX_FILE_BYTES = 1_000_000L  // 이 크기를 넘으면 오래된 기록 정리 (약 1MB)
     private const val TRIM_KEEP_LINES = 3000       // 정리 후 남길 최신 기록 수
 }

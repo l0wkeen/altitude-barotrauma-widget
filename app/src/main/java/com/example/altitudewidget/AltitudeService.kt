@@ -120,9 +120,7 @@ class AltitudeService : Service(), SensorEventListener {
         Log.d(TAG, "Sensor registration status: $registered")
 
         handler.post(updateRunnable)
-        logExecutor.execute {
-            personalLevel1Threshold = EarLogRepository.getPersonalThreshold(applicationContext)
-        }
+        logExecutor.execute { refreshPersonalThreshold() }
         Log.d(TAG, "Service Created and updateRunnable started")
     }
 
@@ -237,7 +235,7 @@ class AltitudeService : Service(), SensorEventListener {
                 val appContext = applicationContext
                 logExecutor.execute {
                     EarLogRepository.save(appContext, logEntry)
-                    personalLevel1Threshold = EarLogRepository.getPersonalThreshold(appContext)
+                    refreshPersonalThreshold()
                 }
                 if (updateCount >= LOG_SAVE_INTERVAL) updateCount = 0
                 Log.d(TAG, "EarLog saved: alt=${latestSmoothedAltitude}m, change=${accumulatedChange}m, alert=$alertFired")
@@ -247,12 +245,25 @@ class AltitudeService : Service(), SensorEventListener {
         previousAltitude = latestSmoothedAltitude
     }
 
+    // 개인 맞춤 임계값을 다시 계산하고 SharedPreferences에도 반영한다.
+    // 위젯(AltitudeWidgetProvider)은 이 Service 인스턴스에 직접 접근할 수 없으므로,
+    // 위젯의 행동 추천 표시가 실제 알림 기준과 어긋나지 않으려면 prefs를 통해 공유해야 한다.
+    // logExecutor(백그라운드 스레드)에서만 호출한다.
+    private fun refreshPersonalThreshold() {
+        val threshold = EarLogRepository.getPersonalThreshold(applicationContext)
+        personalLevel1Threshold = threshold
+        getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(AltitudeWidgetProvider.KEY_PERSONAL_THRESHOLD, threshold)
+            .apply()
+    }
+
     // ============ 귀 압력 알림 (반환값: 알림이 실제로 발생했는지) ============
     private fun sendAlertIfNeeded(accumulatedChange: Float, immediateChange: Float): Boolean {
         val absChange = abs(accumulatedChange)
         val currentLevel = when {
-            absChange >= 50f -> ALERT_LEVEL_3
-            absChange >= 30f -> ALERT_LEVEL_2
+            absChange >= AlertThresholds.LEVEL3_MPM -> ALERT_LEVEL_3
+            absChange >= AlertThresholds.LEVEL2_MPM -> ALERT_LEVEL_2
             absChange >= personalLevel1Threshold -> ALERT_LEVEL_1
             else -> ALERT_NONE
         }
