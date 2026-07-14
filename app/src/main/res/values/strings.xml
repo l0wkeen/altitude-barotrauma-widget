@@ -23,6 +23,8 @@
 
     <!-- 오류 -->
     <string name="no_sensor">기압 센서 없음</string>
+    <string name="sensor_stalled_altitude">센서 응답 없음</string>
+    <string name="sensor_stalled_action">⚠️ 배터리 최적화에서 앱을 제외해보세요</string>
 
     <!-- 알림 채널 -->
     <string name="channel_name">고도 모니터링</string>
@@ -47,8 +49,14 @@
     <string name="permission_denied">⚠️ 알림 권한이 없어 경고 알림을 받을 수 없습니다.\n설정에서 알림을 허용해 주세요.</string>
     <string name="main_activity_hint">홈 화면에 위젯을 추가하면\n고도 변화를 자동으로 모니터링합니다.</string>
 
+    <!-- MainActivity: 배터리 최적화 -->
+    <string name="battery_optimization_ignored">✅ 배터리 최적화 제외됨 (백그라운드 측정에 유리)</string>
+    <string name="battery_optimization_not_ignored">⚠️ 배터리 최적화 대상입니다. 화면이 꺼지면 측정이 멈출 수 있어요.</string>
+    <string name="battery_optimization_button">배터리 최적화에서 제외하기</string>
+
     <!-- MainActivity: 현재 상태 및 증상 기록 -->
     <string name="current_status_no_data">아직 측정된 고도 데이터가 없습니다.\n위젯을 추가하면 측정이 시작됩니다.</string>
+    <string name="current_status_stalled">⚠️ 센서 응답이 없습니다. 배터리 최적화 설정을 확인해 주세요.</string>
     <string name="current_status_format">현재 고도 %,.0f m · 1분 누적 %+.1f m</string>
     <string name="log_stats_format">기록 %1$d개 · 개인 맞춤 임계값 %2$.1f m</string>
     <string name="log_stats_none">아직 기록이 없습니다. 임계값은 기본값(15m)을 사용합니다.</string>

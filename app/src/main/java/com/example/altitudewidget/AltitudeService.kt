@@ -40,6 +40,9 @@ class AltitudeService : Service(), SensorEventListener {
         private const val ALERT_LEVEL_3 = 3
         // 로그 저장 주기: 매 N번째 업데이트마다 1회 저장 (3초 * 10 = 30초마다)
         private const val LOG_SAVE_INTERVAL = 10
+        // 이 시간 동안 센서 콜백이 없으면 "응답 없음"으로 간주 — 배터리 최적화나
+        // Non-wakeup 센서가 화면 꺼짐 중 콜백을 막는 기종에서 실제로 발생한다.
+        private const val SENSOR_STALE_MS = 20_000L
     }
 
     private lateinit var sensorManager: SensorManager
@@ -55,6 +58,9 @@ class AltitudeService : Service(), SensorEventListener {
 
     // 직전 고도값 추적 (immediateChange 계산용)
     private var previousAltitude = AltitudeWidgetProvider.INVALID_ALTITUDE
+
+    // 마지막으로 센서 콜백을 받은 시각 — SENSOR_STALE_MS 이상 갱신 안 되면 응답 없음으로 판단
+    private var lastSensorEventTime = 0L
 
     // 로그 저장 카운터
     private var updateCount = 0
@@ -92,6 +98,7 @@ class AltitudeService : Service(), SensorEventListener {
             .edit()
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
             .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, true)
+            .putBoolean(AltitudeWidgetProvider.KEY_SENSOR_STALLED, false)
             .apply()
 
         createNotificationChannels()
@@ -109,6 +116,7 @@ class AltitudeService : Service(), SensorEventListener {
 
         // SENSOR_DELAY_NORMAL (~200ms): 위젯은 3초 주기 갱신이라 배터리 최적화
         val registered = sensorManager.registerListener(this, pressureSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        lastSensorEventTime = System.currentTimeMillis()
         Log.d(TAG, "Sensor registration status: $registered")
 
         handler.post(updateRunnable)
@@ -132,6 +140,7 @@ class AltitudeService : Service(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent?) {
         event ?: return
         if (event.sensor.type != Sensor.TYPE_PRESSURE) return
+        lastSensorEventTime = System.currentTimeMillis()
         val pressure = event.values[0]
         val rawAltitude = SensorManager.getAltitude(
             SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure
@@ -157,9 +166,22 @@ class AltitudeService : Service(), SensorEventListener {
 
     // ============ 데이터 저장 & 위젯 갱신 ============
     private fun saveAndUpdate() {
+        val now = System.currentTimeMillis()
+
+        // 센서 등록 후 한 번도 값을 못 받았거나, 받다가 중간에 멈춘 경우 —
+        // 배터리 최적화나 Non-wakeup 센서 제한으로 실제 기기에서 발생할 수 있다.
+        // 오래된(멈춘) 값으로 계속 "정상"이라고 표시하지 않도록 여기서 걸러낸다.
+        if (now - lastSensorEventTime > SENSOR_STALE_MS) {
+            getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(AltitudeWidgetProvider.KEY_SENSOR_STALLED, true)
+                .apply()
+            AltitudeWidgetProvider.updateWidgets(this)
+            return
+        }
+
         if (latestSmoothedAltitude == AltitudeWidgetProvider.INVALID_ALTITUDE) return
 
-        val now = System.currentTimeMillis()
         altitudeHistory.addLast(AltitudePoint(now, latestSmoothedAltitude))
 
         // 1분 초과 데이터 제거
@@ -189,6 +211,7 @@ class AltitudeService : Service(), SensorEventListener {
             .putFloat(AltitudeWidgetProvider.KEY_IMMEDIATE_CHANGE, immediateChange)
             .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
             .putBoolean(AltitudeWidgetProvider.KEY_IS_WARMING_UP, isWarmingUp)
+            .putBoolean(AltitudeWidgetProvider.KEY_SENSOR_STALLED, false)
             .apply()
 
         AltitudeWidgetProvider.updateWidgets(this)

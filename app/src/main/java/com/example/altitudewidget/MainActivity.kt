@@ -3,9 +3,13 @@ package com.example.altitudewidget
 import android.Manifest
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -55,11 +59,15 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_clear_logs).setOnClickListener {
             confirmClearLogs()
         }
+        findViewById<Button>(R.id.btn_battery_optimization).setOnClickListener {
+            requestIgnoreBatteryOptimization()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updatePermissionStatusText(hasNotificationPermission())
+        updateBatteryStatusText()
         updateCurrentStatusText()
         loadLogs()
     }
@@ -88,6 +96,32 @@ class MainActivity : ComponentActivity() {
             getString(if (granted) R.string.permission_granted else R.string.permission_denied)
     }
 
+    // ============ 배터리 최적화 ============
+    // 위젯/서비스가 화면이 꺼진 뒤에도 계속 측정하려면 배터리 최적화 대상에서
+    // 빠져야 한다. 특히 Non-wakeup 기압 센서를 쓰는 기종에서는 이 설정이 안 되어
+    // 있으면 화면이 꺼졌을 때 센서 콜백 자체가 끊기는 경우가 실제로 있다.
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun updateBatteryStatusText() {
+        findViewById<TextView>(R.id.text_battery_status).text = getString(
+            if (isIgnoringBatteryOptimizations()) R.string.battery_optimization_ignored
+            else R.string.battery_optimization_not_ignored
+        )
+    }
+
+    private fun requestIgnoreBatteryOptimization() {
+        if (isIgnoringBatteryOptimizations()) return
+        startActivity(
+            Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName")
+            )
+        )
+    }
+
     // ============ 현재 고도 상태 ============
     private fun widgetPrefs() =
         getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
@@ -96,11 +130,15 @@ class MainActivity : ComponentActivity() {
         val prefs = widgetPrefs()
         val altitude = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE)
         val statusView = findViewById<TextView>(R.id.text_current_status)
-        statusView.text = if (altitude == AltitudeWidgetProvider.INVALID_ALTITUDE) {
-            getString(R.string.current_status_no_data)
-        } else {
-            val accumulatedChange = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
-            getString(R.string.current_status_format, altitude, accumulatedChange)
+        statusView.text = when {
+            prefs.getBoolean(AltitudeWidgetProvider.KEY_SENSOR_STALLED, false) ->
+                getString(R.string.current_status_stalled)
+            altitude == AltitudeWidgetProvider.INVALID_ALTITUDE ->
+                getString(R.string.current_status_no_data)
+            else -> {
+                val accumulatedChange = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
+                getString(R.string.current_status_format, altitude, accumulatedChange)
+            }
         }
     }
 
