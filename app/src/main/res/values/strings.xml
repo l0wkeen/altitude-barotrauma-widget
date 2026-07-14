@@ -29,4 +29,9 @@
     <string name="channel_description">Ear Barotrauma 예방을 위한 고도 모니터링 알림</string>
     <string name="notification_title">고도 모니터링 중</string>
     <string name="notification_text">기압 센서로 고도 변화를 추적합니다</string>
+
+    <!-- MainActivity: 알림 권한 요청 화면 -->
+    <string name="permission_granted">✅ 알림 권한이 허용되었습니다</string>
+    <string name="permission_denied">⚠️ 알림 권한이 없어 경고 알림을 받을 수 없습니다.\n설정에서 알림을 허용해 주세요.</string>
+    <string name="main_activity_hint">홈 화면에 위젯을 추가하면\n고도 변화를 자동으로 모니터링합니다.</string>
 </resources>

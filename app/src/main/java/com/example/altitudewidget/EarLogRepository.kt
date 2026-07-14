@@ -55,8 +55,8 @@ object EarLogRepository {
     /**
      * 개인 맞춤 임계값 계산
      *
-     * 누적된 로그로부터 사용자가 실제로 곋먹함을 경험한(symptomLevel > 0) 경우의
-     * accumulatedChange 평균을 구하여 개인의 연약 구간을 운 좋에서 융통적으로 설정
+     * 누적된 로그로부터 사용자가 실제로 귀 먹먹함을 경험한(symptomLevel > 0) 경우의
+     * accumulatedChange 평균을 구하여 개인의 민감 구간에 맞게 임계값을 조정한다.
      *
      * 로그 수가 MIN_LOGS_FOR_PERSONAL 미만이면 기본값 반환
      *
@@ -72,8 +72,8 @@ object EarLogRepository {
             .toFloat()
 
         // 평균의 80%를 임계값으로 설정
-        // (예: 평상 25m에서 증상 나탈 시 임계값 = 20m)
-        // 최소 5m 코어, 최대 기본값 15m 범위 내에서
+        // (예: 평균 25m에서 증상 발생 시 임계값 = 20m)
+        // 최소 5m, 최대 기본값 15m 범위 내로 제한
         val personal = (avgChange * 0.8f)
             .coerceAtLeast(MIN_THRESHOLD)
             .coerceAtMost(DEFAULT_THRESHOLD_LEVEL1)
@@ -96,7 +96,7 @@ object EarLogRepository {
     }
 
     /**
-     * 사용자 외부 뫨리 데이터 (최근 7일) 요약
+     * 최근 N일간의 로그 요약
      */
     fun getRecentSummary(context: Context, days: Int = 7): Map<String, Any> {
         val cutoff = System.currentTimeMillis() - days * 24 * 60 * 60 * 1000L
@@ -148,6 +148,6 @@ object EarLogRepository {
 
     // ============ 상수 ============
     private const val MIN_LOGS_FOR_PERSONAL = 5   // 개인화 최소 샘플 수
-    private const val DEFAULT_THRESHOLD_LEVEL1 = 15f  // 기본 1단계 임계값 (m)
+    const val DEFAULT_THRESHOLD_LEVEL1 = 15f       // 기본 1단계 임계값 (m)
     private const val MIN_THRESHOLD = 5f              // 최소 허용 임계값 (m)
 }

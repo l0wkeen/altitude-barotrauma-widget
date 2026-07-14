@@ -41,14 +41,11 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
 
             val views = RemoteViews(context.packageName, R.layout.widget_altitude)
 
-            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            if (intent != null) {
-                val pendingIntent = PendingIntent.getActivity(
-                    context, 0, intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
-            }
+            val pendingIntent = PendingIntent.getActivity(
+                context, 0, Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
 
             if (!hasSensor) {
                 views.setTextViewText(R.id.text_altitude, context.getString(R.string.no_sensor))

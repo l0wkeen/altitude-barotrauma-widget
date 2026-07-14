@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Activity 에는 실제 사용되지 않지만 빌드 필수 -->
     <style name="Theme.AltitudeWidget" parent="android:Theme.DeviceDefault" />
 </resources>
