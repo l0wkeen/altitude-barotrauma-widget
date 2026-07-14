@@ -34,7 +34,7 @@ android {
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.13.1'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.activity:activity-ktx:1.9.3'
     // WorkManager 제거: 서비스 시작은 onUpdate/BootReceiver에서 직접 처리
+    // appcompat 제거: MainActivity가 ComponentActivity + 플랫폼 AlertDialog만 사용해 불필요
 }
