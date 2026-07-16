@@ -28,7 +28,8 @@ class AltitudeService : Service(), SensorEventListener {
     companion object {
         private const val TAG = "AltitudeService"
         private const val CHANNEL_ID = "altitude_channel"
-        private const val ALERT_CHANNEL_ID = "altitude_alert"
+        // 경고 알림 채널 ID — MainActivity의 테스트 알림에서도 재사용하므로 공개한다.
+        const val ALERT_CHANNEL_ID = "altitude_alert"
         private const val NOTIFICATION_ID = 1
         private const val ALERT_NOTIFICATION_ID = 1001
         private const val UPDATE_INTERVAL_MS = 3_000L

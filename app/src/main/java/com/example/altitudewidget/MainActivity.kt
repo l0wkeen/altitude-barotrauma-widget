@@ -3,9 +3,12 @@ package com.example.altitudewidget
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.core.app.NotificationCompat
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -46,6 +49,7 @@ class MainActivity : ComponentActivity() {
         private const val HISTORY_SIZE = 8
         private const val LOCATION_MAX_AGE_MS = 120_000L   // 이보다 오래된 위치는 새로 요청
         private const val LOCATION_TIMEOUT_MS = 15_000L    // 위치 단일 요청 최대 대기
+        private const val TEST_NOTIFICATION_ID = 2001      // 테스트 알림 ID (실제 경고 1001과 구분)
     }
 
     private val logExecutor = Executors.newSingleThreadExecutor()
@@ -89,6 +93,9 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_calibrate_manual).setOnClickListener {
             showManualCalibration()
         }
+        findViewById<Button>(R.id.btn_test_notification).setOnClickListener {
+            sendTestNotification()
+        }
     }
 
     override fun onResume() {
@@ -123,6 +130,39 @@ class MainActivity : ComponentActivity() {
     private fun updatePermissionStatusText(granted: Boolean) {
         findViewById<TextView>(R.id.text_permission_status).text =
             getString(if (granted) R.string.permission_granted else R.string.permission_denied)
+    }
+
+    // ============ 테스트 알림 ============
+    // 실제 경고는 1분에 90m 이상 고도가 변해야 떠서 책상에서는 확인이 어렵다.
+    // 이 버튼은 실제 경고 알림과 같은 채널로 표본 알림을 즉시 띄워 동작 확인·스크린샷용으로 쓴다.
+    private fun sendTestNotification() {
+        if (!hasNotificationPermission()) {
+            Toast.makeText(this, R.string.test_notification_permission_needed, Toast.LENGTH_SHORT).show()
+            requestNotificationPermissionIfNeeded()
+            return
+        }
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // 서비스가 아직 실행되지 않아 채널이 없을 수 있으므로 여기서도 보장한다(생성은 멱등).
+        nm.createNotificationChannel(
+            NotificationChannel(
+                AltitudeService.ALERT_CHANNEL_ID,
+                getString(R.string.alert_channel_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.alert_channel_description)
+                enableVibration(true)
+            }
+        )
+        nm.notify(
+            TEST_NOTIFICATION_ID,
+            NotificationCompat.Builder(this, AltitudeService.ALERT_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle(getString(R.string.test_notification_title))
+                .setContentText(getString(R.string.test_notification_body))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+        )
     }
 
     // ============ 배터리 최적화 ============
