@@ -21,6 +21,10 @@ class AltitudeWidgetProvider : AppWidgetProvider() {
         const val KEY_IS_WARMING_UP = "is_warming_up"
         const val KEY_SENSOR_STALLED = "sensor_stalled"
         const val KEY_PERSONAL_THRESHOLD = "personal_threshold"
+        // 표시용 고도는 KEY_ALTITUDE(보정 적용값), 보정 계산용 원시 고도는 KEY_ALTITUDE_RAW,
+        // 보정 오프셋(실제 고도 − 원시 고도)은 KEY_ALTITUDE_OFFSET에 저장한다.
+        const val KEY_ALTITUDE_RAW = "current_altitude_raw"
+        const val KEY_ALTITUDE_OFFSET = "altitude_offset"
         const val INVALID_ALTITUDE = Float.MIN_VALUE
 
         fun updateWidgets(context: Context) {

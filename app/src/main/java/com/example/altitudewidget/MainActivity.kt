@@ -1,16 +1,25 @@
 package com.example.altitudewidget
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.InputType
+import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -35,14 +44,26 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val HISTORY_SIZE = 8
+        private const val LOCATION_MAX_AGE_MS = 120_000L   // 이보다 오래된 위치는 새로 요청
+        private const val LOCATION_TIMEOUT_MS = 15_000L    // 위치 단일 요청 최대 대기
     }
 
     private val logExecutor = Executors.newSingleThreadExecutor()
     private val timeFormatter = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             updatePermissionStatusText(granted)
+        }
+
+    private val requestLocationLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            if (result.values.any { it }) {
+                startAutoCalibration()
+            } else {
+                Toast.makeText(this, R.string.calibration_location_permission_denied, Toast.LENGTH_SHORT).show()
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,18 +83,26 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_battery_optimization).setOnClickListener {
             requestIgnoreBatteryOptimization()
         }
+        findViewById<Button>(R.id.btn_calibrate_auto).setOnClickListener {
+            startAutoCalibration()
+        }
+        findViewById<Button>(R.id.btn_calibrate_manual).setOnClickListener {
+            showManualCalibration()
+        }
     }
 
     override fun onResume() {
         super.onResume()
         updatePermissionStatusText(hasNotificationPermission())
         updateBatteryStatusText()
+        updateCalibrationStatusText()
         updateCurrentStatusText()
         loadLogs()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacksAndMessages(null)
         logExecutor.shutdown()
     }
 
@@ -106,10 +135,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateBatteryStatusText() {
+        val ignoring = isIgnoringBatteryOptimizations()
         findViewById<TextView>(R.id.text_battery_status).text = getString(
-            if (isIgnoringBatteryOptimizations()) R.string.battery_optimization_ignored
+            if (ignoring) R.string.battery_optimization_ignored
             else R.string.battery_optimization_not_ignored
         )
+        // 이미 배터리 최적화에서 제외된 상태면 버튼을 숨긴다(상태 문구만 표시).
+        findViewById<Button>(R.id.btn_battery_optimization).visibility =
+            if (ignoring) View.GONE else View.VISIBLE
     }
 
     private fun requestIgnoreBatteryOptimization() {
@@ -120,6 +153,156 @@ class MainActivity : ComponentActivity() {
                 Uri.parse("package:$packageName")
             )
         )
+    }
+
+    // ============ 고도 보정 ============
+    // 기압 고도는 표준 해수면 기압(1013.25 hPa)을 가정하므로 그날의 실제 기압에 따라
+    // 절대 고도가 수십 m 어긋날 수 있다. 실제 고도를 기준으로 오프셋을 저장해 표시를 보정한다.
+    // 변화량 기반 알림 로직에는 영향이 없다(오프셋이 차이값에서 상쇄됨).
+
+    private fun updateCalibrationStatusText() {
+        val offset = widgetPrefs().getFloat(AltitudeWidgetProvider.KEY_ALTITUDE_OFFSET, 0f)
+        findViewById<TextView>(R.id.text_calibration_status).text =
+            if (offset == 0f) getString(R.string.calibration_none)
+            else getString(R.string.calibration_applied_format, offset)
+    }
+
+    private fun currentRawAltitude(): Float =
+        widgetPrefs().getFloat(AltitudeWidgetProvider.KEY_ALTITUDE_RAW, AltitudeWidgetProvider.INVALID_ALTITUDE)
+
+    private fun saveOffset(offset: Float) {
+        widgetPrefs().edit()
+            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE_OFFSET, offset)
+            .apply()
+        updateCalibrationStatusText()
+        // 위젯/현재 상태 표시는 다음 서비스 갱신(최대 3초) 때 반영된다.
+        updateCurrentStatusText()
+    }
+
+    // ---- 수동 보정 (C) ----
+    private fun showManualCalibration() {
+        if (currentRawAltitude() == AltitudeWidgetProvider.INVALID_ALTITUDE) {
+            Toast.makeText(this, R.string.calibration_no_raw, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or
+                InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+            hint = getString(R.string.calibration_manual_hint)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.calibration_manual_title)
+            .setMessage(R.string.calibration_manual_message)
+            .setView(input)
+            .setPositiveButton(R.string.calibration_ok) { _, _ ->
+                val trueAlt = input.text.toString().trim().toFloatOrNull()
+                val raw = currentRawAltitude()
+                if (trueAlt == null || raw == AltitudeWidgetProvider.INVALID_ALTITUDE) {
+                    Toast.makeText(this, R.string.calibration_manual_invalid, Toast.LENGTH_SHORT).show()
+                } else {
+                    saveOffset(trueAlt - raw)
+                    Toast.makeText(this, R.string.calibration_manual_done, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNeutralButton(R.string.calibration_reset) { _, _ ->
+                saveOffset(0f)
+                Toast.makeText(this, R.string.calibration_reset_done, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.calibration_cancel, null)
+            .show()
+    }
+
+    // ---- 자동 보정 (B): GPS 좌표 → 고도 API ----
+    private fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun startAutoCalibration() {
+        if (!hasLocationPermission()) {
+            requestLocationLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            )
+            return
+        }
+        if (currentRawAltitude() == AltitudeWidgetProvider.INVALID_ALTITUDE) {
+            Toast.makeText(this, R.string.calibration_no_raw, Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, R.string.calibration_locating, Toast.LENGTH_SHORT).show()
+        requestCurrentLocation { location ->
+            if (location == null) {
+                Toast.makeText(this, R.string.calibration_location_failed, Toast.LENGTH_LONG).show()
+                return@requestCurrentLocation
+            }
+            val lat = location.latitude
+            val lon = location.longitude
+            logExecutor.execute {
+                val elevation = ElevationApi.fetchElevation(lat, lon)
+                runOnUiThread {
+                    if (elevation == null) {
+                        Toast.makeText(this, R.string.calibration_api_failed, Toast.LENGTH_LONG).show()
+                    } else {
+                        val raw = currentRawAltitude()
+                        if (raw != AltitudeWidgetProvider.INVALID_ALTITUDE) {
+                            saveOffset(elevation.toFloat() - raw)
+                            Toast.makeText(
+                                this,
+                                getString(R.string.calibration_auto_done_format, elevation),
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")  // 호출 전 hasLocationPermission()으로 확인함
+    private fun requestCurrentLocation(callback: (Location?) -> Unit) {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+
+        val lastKnown = providers
+            .filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+            .mapNotNull { runCatching { lm.getLastKnownLocation(it) }.getOrNull() }
+            .maxByOrNull { it.time }
+
+        if (lastKnown != null &&
+            System.currentTimeMillis() - lastKnown.time < LOCATION_MAX_AGE_MS
+        ) {
+            callback(lastKnown)
+            return
+        }
+
+        val provider = providers.firstOrNull { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
+        if (provider == null) {
+            callback(lastKnown) // 최후: 오래됐더라도 마지막 위치라도 사용
+            return
+        }
+
+        var finished = false
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                if (finished) return
+                finished = true
+                runCatching { lm.removeUpdates(this) }
+                callback(location)
+            }
+            override fun onProviderDisabled(provider: String) {}
+            override fun onProviderEnabled(provider: String) {}
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+        }
+        runCatching { lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper()) }
+        mainHandler.postDelayed({
+            if (!finished) {
+                finished = true
+                runCatching { lm.removeUpdates(listener) }
+                callback(lastKnown)
+            }
+        }, LOCATION_TIMEOUT_MS)
     }
 
     // ============ 현재 고도 상태 ============

@@ -202,9 +202,15 @@ class AltitudeService : Service(), SensorEventListener {
             0f
         }
 
-        getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, latestSmoothedAltitude)
+        // 보정 오프셋을 적용한 표시용 고도. 변화량(accumulatedChange/immediateChange)은
+        // 차이값이라 오프셋이 상쇄되므로 원시값 기준 그대로 사용한다.
+        val prefs = getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+        val offset = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE_OFFSET, 0f)
+        val calibratedAltitude = latestSmoothedAltitude + offset
+
+        prefs.edit()
+            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE, calibratedAltitude)
+            .putFloat(AltitudeWidgetProvider.KEY_ALTITUDE_RAW, latestSmoothedAltitude)
             .putFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, accumulatedChange)
             .putFloat(AltitudeWidgetProvider.KEY_IMMEDIATE_CHANGE, immediateChange)
             .putBoolean(AltitudeWidgetProvider.KEY_HAS_SENSOR, true)
@@ -226,7 +232,7 @@ class AltitudeService : Service(), SensorEventListener {
                 // 순환 논리(변화량 → 추정 증상 → 다시 변화량 기준 임계값) 없이 계산된다.
                 val logEntry = EarLogData(
                     timestamp = now,
-                    altitude = latestSmoothedAltitude,
+                    altitude = calibratedAltitude,
                     accumulatedChange = accumulatedChange,
                     immediateChange = immediateChange,
                     symptomLevel = EarLogData.SYMPTOM_NONE,
@@ -311,10 +317,13 @@ class AltitudeService : Service(), SensorEventListener {
         immediateChange: Float,
         requestCode: Int
     ): PendingIntent {
+        // 알림에서 기록되는 고도도 표시용(보정 적용) 값으로 통일한다.
+        val offset = getSharedPreferences(AltitudeWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(AltitudeWidgetProvider.KEY_ALTITUDE_OFFSET, 0f)
         val intent = Intent(this, SymptomLogReceiver::class.java).apply {
             action = SymptomLogReceiver.ACTION_LOG_SYMPTOM
             putExtra(SymptomLogReceiver.EXTRA_SYMPTOM_LEVEL, symptomLevel)
-            putExtra(SymptomLogReceiver.EXTRA_ALTITUDE, latestSmoothedAltitude)
+            putExtra(SymptomLogReceiver.EXTRA_ALTITUDE, latestSmoothedAltitude + offset)
             putExtra(SymptomLogReceiver.EXTRA_ACCUMULATED_CHANGE, accumulatedChange)
             putExtra(SymptomLogReceiver.EXTRA_IMMEDIATE_CHANGE, immediateChange)
             putExtra(SymptomLogReceiver.EXTRA_NOTIFICATION_ID, ALERT_NOTIFICATION_ID)

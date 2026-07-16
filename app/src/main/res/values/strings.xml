@@ -56,6 +56,28 @@
     <string name="battery_optimization_not_ignored">⚠️ 배터리 최적화 대상입니다. 화면이 꺼지면 측정이 멈출 수 있어요.</string>
     <string name="battery_optimization_button">배터리 최적화에서 제외하기</string>
 
+    <!-- MainActivity: 고도 보정 -->
+    <string name="calibration_section_title">고도 보정</string>
+    <string name="calibration_none">현재 보정 안 됨 (표준 기압 기준, 절대 고도에 오차 가능)</string>
+    <string name="calibration_applied_format">✅ 보정 적용 중: %+.1f m</string>
+    <string name="calibration_auto_button">자동 보정 (GPS·인터넷)</string>
+    <string name="calibration_manual_button">수동 보정</string>
+    <string name="calibration_no_raw">아직 기압 고도가 측정되지 않았습니다. 잠시 후 다시 시도해 주세요.</string>
+    <string name="calibration_locating">현재 위치를 확인하는 중…</string>
+    <string name="calibration_location_failed">위치를 가져오지 못했습니다. GPS를 켜고 야외에서 다시 시도해 주세요.</string>
+    <string name="calibration_location_permission_denied">위치 권한이 없어 자동 보정을 할 수 없습니다.</string>
+    <string name="calibration_api_failed">고도 조회에 실패했습니다. 인터넷 연결을 확인해 주세요.</string>
+    <string name="calibration_auto_done_format">자동 보정 완료: 실제 고도 약 %,.0f m 기준</string>
+    <string name="calibration_manual_title">수동 고도 보정</string>
+    <string name="calibration_manual_message">현재 위치의 실제 고도(m)를 입력하세요.</string>
+    <string name="calibration_manual_hint">예: 27</string>
+    <string name="calibration_manual_invalid">숫자를 입력해 주세요.</string>
+    <string name="calibration_ok">보정</string>
+    <string name="calibration_reset">보정 해제</string>
+    <string name="calibration_cancel">취소</string>
+    <string name="calibration_manual_done">보정이 적용되었습니다.</string>
+    <string name="calibration_reset_done">보정을 해제했습니다.</string>
+
     <!-- MainActivity: 현재 상태 및 증상 기록 -->
     <string name="current_status_no_data">아직 측정된 고도 데이터가 없습니다.\n위젯을 추가하면 측정이 시작됩니다.</string>
     <string name="current_status_stalled">⚠️ 센서 응답이 없습니다. 배터리 최적화 설정을 확인해 주세요.</string>
