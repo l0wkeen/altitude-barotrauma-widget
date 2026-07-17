@@ -26,12 +26,44 @@
             android:textSize="14sp"
             android:gravity="center" />
 
-        <Button
-            android:id="@+id/btn_test_notification"
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/test_notification_button" />
+            android:layout_marginTop="12dp"
+            android:text="@string/test_notification_label"
+            android:textSize="12sp"
+            android:gravity="center" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btn_test_level1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="@string/test_level1_button" />
+
+            <Button
+                android:id="@+id/btn_test_level2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="@string/test_level2_button" />
+
+            <Button
+                android:id="@+id/btn_test_level3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/test_level3_button" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/text_battery_status"

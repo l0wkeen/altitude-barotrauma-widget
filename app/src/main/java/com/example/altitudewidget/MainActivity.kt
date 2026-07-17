@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -49,7 +50,7 @@ class MainActivity : ComponentActivity() {
         private const val HISTORY_SIZE = 8
         private const val LOCATION_MAX_AGE_MS = 120_000L   // 이보다 오래된 위치는 새로 요청
         private const val LOCATION_TIMEOUT_MS = 15_000L    // 위치 단일 요청 최대 대기
-        private const val TEST_NOTIFICATION_ID = 2001      // 테스트 알림 ID (실제 경고 1001과 구분)
+        private const val TEST_NOTIFICATION_ID_BASE = 2000 // 테스트 알림 ID 기준 (+단계, 실제 경고 1001과 구분)
     }
 
     private val logExecutor = Executors.newSingleThreadExecutor()
@@ -93,9 +94,9 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_calibrate_manual).setOnClickListener {
             showManualCalibration()
         }
-        findViewById<Button>(R.id.btn_test_notification).setOnClickListener {
-            sendTestNotification()
-        }
+        findViewById<Button>(R.id.btn_test_level1).setOnClickListener { sendTestAlert(1) }
+        findViewById<Button>(R.id.btn_test_level2).setOnClickListener { sendTestAlert(2) }
+        findViewById<Button>(R.id.btn_test_level3).setOnClickListener { sendTestAlert(3) }
     }
 
     override fun onResume() {
@@ -134,8 +135,9 @@ class MainActivity : ComponentActivity() {
 
     // ============ 테스트 알림 ============
     // 실제 경고는 1분에 90m 이상 고도가 변해야 떠서 책상에서는 확인이 어렵다.
-    // 이 버튼은 실제 경고 알림과 같은 채널로 표본 알림을 즉시 띄워 동작 확인·스크린샷용으로 쓴다.
-    private fun sendTestNotification() {
+    // 이 버튼들은 실제 1·2·3단계 경고 알림과 동일한 제목·문구·기록 버튼으로 즉시 알림을
+    // 띄워 동작 확인·스크린샷용으로 쓴다.
+    private fun sendTestAlert(level: Int) {
         if (!hasNotificationPermission()) {
             Toast.makeText(this, R.string.test_notification_permission_needed, Toast.LENGTH_SHORT).show()
             requestNotificationPermissionIfNeeded()
@@ -153,15 +155,69 @@ class MainActivity : ComponentActivity() {
                 enableVibration(true)
             }
         )
-        nm.notify(
-            TEST_NOTIFICATION_ID,
-            NotificationCompat.Builder(this, AltitudeService.ALERT_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle(getString(R.string.test_notification_title))
-                .setContentText(getString(R.string.test_notification_body))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build()
+
+        val (title, body) = when (level) {
+            3 -> getString(R.string.alert_title_level3) to getString(R.string.alert_body_level3)
+            2 -> getString(R.string.alert_title_level2) to getString(R.string.alert_body_level2)
+            else -> getString(R.string.alert_title_level1) to getString(R.string.alert_body_level1)
+        }
+
+        val notificationId = TEST_NOTIFICATION_ID_BASE + level
+        val prefs = widgetPrefs()
+        val altitude = prefs.getFloat(AltitudeWidgetProvider.KEY_ALTITUDE, AltitudeWidgetProvider.INVALID_ALTITUDE)
+        val accumulatedChange = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
+        val immediateChange = prefs.getFloat(AltitudeWidgetProvider.KEY_IMMEDIATE_CHANGE, 0f)
+
+        val builder = NotificationCompat.Builder(this, AltitudeService.ALERT_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this, 0, Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+
+        // 실제 알림과 동일하게 증상 기록 액션 버튼도 붙인다.
+        // 측정값이 있어야 기록이 저장되므로, 측정 전이면 액션 없이 표시만 한다.
+        if (altitude != AltitudeWidgetProvider.INVALID_ALTITUDE) {
+            builder.addAction(
+                android.R.drawable.ic_menu_add,
+                getString(R.string.alert_action_mild),
+                testSymptomAction(EarLogData.SYMPTOM_MILD, altitude, accumulatedChange, immediateChange, notificationId, level * 10 + 1)
+            )
+            builder.addAction(
+                android.R.drawable.ic_menu_add,
+                getString(R.string.alert_action_severe),
+                testSymptomAction(EarLogData.SYMPTOM_SEVERE, altitude, accumulatedChange, immediateChange, notificationId, level * 10 + 2)
+            )
+        }
+
+        nm.notify(notificationId, builder.build())
+    }
+
+    private fun testSymptomAction(
+        symptomLevel: Int,
+        altitude: Float,
+        accumulatedChange: Float,
+        immediateChange: Float,
+        notificationId: Int,
+        requestCode: Int
+    ): PendingIntent {
+        val intent = Intent(this, SymptomLogReceiver::class.java).apply {
+            action = SymptomLogReceiver.ACTION_LOG_SYMPTOM
+            putExtra(SymptomLogReceiver.EXTRA_SYMPTOM_LEVEL, symptomLevel)
+            putExtra(SymptomLogReceiver.EXTRA_ALTITUDE, altitude)
+            putExtra(SymptomLogReceiver.EXTRA_ACCUMULATED_CHANGE, accumulatedChange)
+            putExtra(SymptomLogReceiver.EXTRA_IMMEDIATE_CHANGE, immediateChange)
+            putExtra(SymptomLogReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        return PendingIntent.getBroadcast(
+            this, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
