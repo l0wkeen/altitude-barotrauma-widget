@@ -97,6 +97,16 @@ class MainActivity : ComponentActivity() {
         findViewById<Button>(R.id.btn_test_level1).setOnClickListener { sendTestAlert(1) }
         findViewById<Button>(R.id.btn_test_level2).setOnClickListener { sendTestAlert(2) }
         findViewById<Button>(R.id.btn_test_level3).setOnClickListener { sendTestAlert(3) }
+        findViewById<Button>(R.id.btn_prevention_guide).setOnClickListener { showPreventionGuide() }
+    }
+
+    // ============ 예방 행동 안내 ============
+    private fun showPreventionGuide() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.prevention_guide_title)
+            .setMessage(R.string.prevention_guide_body)
+            .setPositiveButton(R.string.prevention_guide_close, null)
+            .show()
     }
 
     override fun onResume() {
@@ -180,6 +190,14 @@ class MainActivity : ComponentActivity() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
+
+        // 3단계는 실제 알림과 동일하게 펼치면 발살바 방법이 보이도록 한다.
+        if (level == 3) {
+            builder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(body + "\n\n" + getString(R.string.alert_valsalva_steps))
+            )
+        }
 
         // 실제 알림과 동일하게 증상 기록 액션 버튼도 붙인다.
         // 측정값이 있어야 기록이 저장되므로, 측정 전이면 액션 없이 표시만 한다.

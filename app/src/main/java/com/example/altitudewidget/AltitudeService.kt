@@ -283,27 +283,34 @@ class AltitudeService : Service(), SensorEventListener {
             ALERT_LEVEL_2 -> getString(R.string.alert_title_level2) to getString(R.string.alert_body_level2)
             else -> getString(R.string.alert_title_level1) to getString(R.string.alert_body_level1)
         }
+        val builder = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(openAppPendingIntent())
+            .addAction(
+                android.R.drawable.ic_menu_add,
+                getString(R.string.alert_action_mild),
+                symptomActionPendingIntent(EarLogData.SYMPTOM_MILD, accumulatedChange, immediateChange, requestCode = 101)
+            )
+            .addAction(
+                android.R.drawable.ic_menu_add,
+                getString(R.string.alert_action_severe),
+                symptomActionPendingIntent(EarLogData.SYMPTOM_SEVERE, accumulatedChange, immediateChange, requestCode = 102)
+            )
+
+        // 3단계(발살바 권장)는 알림을 펼치면 발살바 방법이 보이도록 확장형으로 표시한다.
+        if (currentLevel == ALERT_LEVEL_3) {
+            builder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(body + "\n\n" + getString(R.string.alert_valsalva_steps))
+            )
+        }
+
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(ALERT_NOTIFICATION_ID,
-            NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_alert)
-                .setContentTitle(title)
-                .setContentText(body)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setContentIntent(openAppPendingIntent())
-                .addAction(
-                    android.R.drawable.ic_menu_add,
-                    getString(R.string.alert_action_mild),
-                    symptomActionPendingIntent(EarLogData.SYMPTOM_MILD, accumulatedChange, immediateChange, requestCode = 101)
-                )
-                .addAction(
-                    android.R.drawable.ic_menu_add,
-                    getString(R.string.alert_action_severe),
-                    symptomActionPendingIntent(EarLogData.SYMPTOM_SEVERE, accumulatedChange, immediateChange, requestCode = 102)
-                )
-                .build()
-        )
+        nm.notify(ALERT_NOTIFICATION_ID, builder.build())
         return true
     }
 

@@ -45,6 +45,14 @@
     <string name="alert_body_level3">발살바법을 시도해 보세요 (코 막고 코 풀기)</string>
     <string name="alert_action_mild">약간 먹먹해요</string>
     <string name="alert_action_severe">심하게 먹먹해요</string>
+    <!-- 3단계 알림을 펼쳤을 때 보이는 발살바 방법 (BigTextStyle) -->
+    <string name="alert_valsalva_steps">발살바 방법: ① 입을 다물고 ② 콧구멍을 손가락으로 막은 뒤 ③ 코로 숨을 내쉬듯 부드럽게 힘을 줍니다. ‘뻥’ 뚫리는 느낌이 나면 멈추세요.\n※ 너무 세게 하면 고막이 손상될 수 있으니 부드럽게 하세요.</string>
+
+    <!-- 예방 행동 안내 (앱 내 다이얼로그) -->
+    <string name="prevention_guide_button">예방 행동 방법 보기</string>
+    <string name="prevention_guide_title">귀 압력 완화 방법</string>
+    <string name="prevention_guide_body">고도 변화로 귀가 먹먹할 때 이관(耳管)을 열어 압력을 맞추는 방법입니다.\n\n■ 물 마시기 · 삼키기\n침을 삼키거나 물을 한 모금씩 마시면 이관이 열립니다. 가장 부담 없는 방법입니다.\n\n■ 하품하기\n크게 하품하면 이관 주변 근육이 움직여 압력이 풀립니다.\n\n■ 발살바 기법 (가장 강력, 주의 필요)\n1. 입을 다뭅니다.\n2. 엄지와 검지로 양쪽 콧구멍을 살짝 막습니다.\n3. 코로 숨을 내쉬듯 부드럽게 힘을 줍니다.\n4. ‘뻥’ 뚫리는 느낌이 나면 즉시 멈춥니다.\n\n※ 주의: 너무 세게 하면 고막이 손상될 수 있습니다. 부드럽게 하고, 아프면 즉시 중단하세요. 감기나 중이염이 있을 때는 하지 않는 것이 좋습니다.</string>
+    <string name="prevention_guide_close">닫기</string>
 
     <!-- MainActivity: 알림 권한 요청 화면 -->
     <string name="permission_granted">✅ 알림 권한이 허용되었습니다</string>
