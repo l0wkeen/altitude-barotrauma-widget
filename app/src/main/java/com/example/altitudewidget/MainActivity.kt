@@ -51,6 +51,8 @@ class MainActivity : ComponentActivity() {
         private const val LOCATION_MAX_AGE_MS = 120_000L   // 이보다 오래된 위치는 새로 요청
         private const val LOCATION_TIMEOUT_MS = 15_000L    // 위치 단일 요청 최대 대기
         private const val TEST_NOTIFICATION_ID_BASE = 2000 // 테스트 알림 ID 기준 (+단계, 실제 경고 1001과 구분)
+        // 3단계 알림을 탭하면 앱을 열면서 발살바 방법 안내를 바로 띄우기 위한 인텐트 플래그
+        const val EXTRA_SHOW_GUIDE = "com.example.altitudewidget.SHOW_PREVENTION_GUIDE"
     }
 
     private val logExecutor = Executors.newSingleThreadExecutor()
@@ -75,6 +77,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         requestNotificationPermissionIfNeeded()
+        maybeShowGuideFromIntent(intent)
 
         findViewById<Button>(R.id.btn_symptom_mild).setOnClickListener {
             logSymptom(EarLogData.SYMPTOM_MILD)
@@ -101,6 +104,20 @@ class MainActivity : ComponentActivity() {
     }
 
     // ============ 예방 행동 안내 ============
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        maybeShowGuideFromIntent(intent)
+    }
+
+    // 3단계 알림을 탭해 들어온 경우, 발살바 방법 안내를 자동으로 띄운다.
+    private fun maybeShowGuideFromIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_SHOW_GUIDE, false) == true) {
+            intent.removeExtra(EXTRA_SHOW_GUIDE) // 화면 회전 등으로 재실행 시 중복 표시 방지
+            showPreventionGuide()
+        }
+    }
+
     private fun showPreventionGuide() {
         AlertDialog.Builder(this)
             .setTitle(R.string.prevention_guide_title)
@@ -178,6 +195,11 @@ class MainActivity : ComponentActivity() {
         val accumulatedChange = prefs.getFloat(AltitudeWidgetProvider.KEY_ACCUMULATED_CHANGE, 0f)
         val immediateChange = prefs.getFloat(AltitudeWidgetProvider.KEY_IMMEDIATE_CHANGE, 0f)
 
+        // 3단계는 탭하면 발살바 방법 안내가 바로 뜨도록 인텐트에 플래그를 싣는다.
+        val tapIntent = Intent(this, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        if (level == 3) tapIntent.putExtra(EXTRA_SHOW_GUIDE, true)
+
         val builder = NotificationCompat.Builder(this, AltitudeService.ALERT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(title)
@@ -186,12 +208,12 @@ class MainActivity : ComponentActivity() {
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(
-                    this, 0, Intent(this, MainActivity::class.java),
+                    this, level, tapIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
 
-        // 3단계는 실제 알림과 동일하게 펼치면 발살바 방법이 보이도록 한다.
+        // 펼쳐도 발살바 방법이 보이도록 3단계는 확장형(BigTextStyle)도 함께 적용한다.
         if (level == 3) {
             builder.setStyle(
                 NotificationCompat.BigTextStyle()

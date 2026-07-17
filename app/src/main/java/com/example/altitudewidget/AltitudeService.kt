@@ -283,13 +283,17 @@ class AltitudeService : Service(), SensorEventListener {
             ALERT_LEVEL_2 -> getString(R.string.alert_title_level2) to getString(R.string.alert_body_level2)
             else -> getString(R.string.alert_title_level1) to getString(R.string.alert_body_level1)
         }
+        // 3단계는 탭하면 발살바 방법 안내가 바로 뜨도록, 그 외에는 앱만 연다.
+        val contentIntent =
+            if (currentLevel == ALERT_LEVEL_3) guidePendingIntent() else openAppPendingIntent()
+
         val builder = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(title)
             .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setContentIntent(openAppPendingIntent())
+            .setContentIntent(contentIntent)
             .addAction(
                 android.R.drawable.ic_menu_add,
                 getString(R.string.alert_action_mild),
@@ -316,6 +320,15 @@ class AltitudeService : Service(), SensorEventListener {
 
     private fun openAppPendingIntent(): PendingIntent = PendingIntent.getActivity(
         this, 0, Intent(this, MainActivity::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // 앱을 열면서 발살바 방법 안내를 바로 띄우는 PendingIntent (3단계 알림 탭용)
+    private fun guidePendingIntent(): PendingIntent = PendingIntent.getActivity(
+        this, 3,
+        Intent(this, MainActivity::class.java)
+            .putExtra(MainActivity.EXTRA_SHOW_GUIDE, true)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
